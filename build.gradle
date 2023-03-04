@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+    id 'com.github.gmazzo.buildconfig' version '3.0.0'
+    id 'com.christophecvb.touchportal.plugin-packager' version "8.3.0"
+}
+
+
+def mainClassSimpleName = 'WaveLinkPlugin'
+def mainClassPackage = 'com.kylergib.wavelinktp'
+group mainClassPackage
+version '1.0.0'
+
+tpPlugin.mainClassSimpleName = mainClassSimpleName
+
+repositories {
+    mavenCentral()
+}
+
+buildConfig {
+    packageName = project.group
+
+    buildConfigField 'String', 'NAME', "\"${project.name}\""
+    buildConfigField 'String', 'VERSION_NAME', "\"${version}\""
+    buildConfigField 'long', 'VERSION_CODE', 100 + ''
+}
+
+dependencies {
+    implementation 'com.christophecvb.touchportal:plugin-sdk:8.3.0'
+    annotationProcessor 'com.christophecvb.touchportal:plugin-sdk-annotations-processor:8.3.0'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    implementation 'org.json:json:20220924'
+}
