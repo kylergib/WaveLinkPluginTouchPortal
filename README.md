@@ -71,7 +71,7 @@ I apologize, but you will need to redo your actions for WaveLinkTP in Touch Port
 - Plugin has not been tested with Wave XLR because I do not have one.
 - 
 ## Features I would like to add:
-- Toggle monitoring between Monitor Mix to Stream Mix.
+- ~~Toggle monitoring between Monitor Mix to Stream Mix.~~
 - ~~Toggle filters on/off for inputs.~~
 - ~~Controls for wave mic (clipguard, gain, lowcut filter, etc)~~
 - ~~Automatically load new changes in inputs/outputs.~~
