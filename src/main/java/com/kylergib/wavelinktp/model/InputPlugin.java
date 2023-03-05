@@ -1,12 +1,12 @@
 package com.kylergib.wavelinktp.model;
-
+/**
+ * Plugins/Filters for inputs in wave link
+ */
 public class InputPlugin {
     private String filterID;
     private String pluginID;
     private String name;
     private Boolean isActive;
-
-
 
     public InputPlugin(String filterID, String pluginID, String name, Boolean isActive) {
         this.filterID = filterID;

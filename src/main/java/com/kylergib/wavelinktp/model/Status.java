@@ -6,7 +6,9 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-
+/**
+ * Current status for things inside of wave link
+ */
 
 public abstract class Status {
     //info about app, probably just need this for debugging

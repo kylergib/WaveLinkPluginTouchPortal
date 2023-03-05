@@ -2,7 +2,9 @@ package com.kylergib.wavelinktp.model;
 
 import org.json.JSONObject;
 
-
+/**
+ * JSON skeleton to send to wave link
+ */
 
 public class WaveJson {
     private String jsonrpc = "2.0";

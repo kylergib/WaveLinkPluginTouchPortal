@@ -1,5 +1,8 @@
 package com.kylergib.wavelinktp.model;
 
+/**
+ * Outputs available in wave link
+ */
 public class Output {
     private int id = 15;
     private String identifier;

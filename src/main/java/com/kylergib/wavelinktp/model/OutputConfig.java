@@ -1,5 +1,9 @@
 package com.kylergib.wavelinktp.model;
 
+
+/**
+ * Config for all the outputs in wave link
+ */
 public class OutputConfig {
     private Boolean streamMixerMuted;
     private int streamMixerLevel;

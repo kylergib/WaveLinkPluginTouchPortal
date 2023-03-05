@@ -1,5 +1,8 @@
 package com.kylergib.wavelinktp.model;
 
+/**
+ * Mixers in wave link (local and stream)
+ */
 public class SwitchState {
     private String mixerId;
     private Boolean isMuted;

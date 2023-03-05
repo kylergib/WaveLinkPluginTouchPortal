@@ -1,5 +1,7 @@
 package com.kylergib.wavelinktp.model;
-
+/**
+ * Mic in wave link
+ */
 public class Microphone {
 
 

@@ -1,7 +1,9 @@
 package com.kylergib.wavelinktp.model;
 
 import java.util.ArrayList;
-
+/**
+ * Inputs in wave link
+ */
 public class Input {
     private int id = 16;
     private String identifier;
