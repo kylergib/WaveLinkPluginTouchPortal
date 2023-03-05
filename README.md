@@ -67,7 +67,8 @@ I apologize, but you will need to redo your actions for WaveLinkTP in Touch Port
 - "Stream" in the actions/connectors is equal to Stream Mix. 
 - I do not think States work, the states were created just to use with the actions, so for example you try to use a state with an if/else it will be blank. 
   - it may be possible to manually type in the if/else statement to correctly match what the state will be set to, but have not tried. may look into this later. 
-- If you add/remove anything from Wave Link (New input or new output), then you will either have to restart Touch Portal or the plugin for it to receive the new inputs/outputs.
+- ~~If you add/remove anything from Wave Link (New input or new output), then you will either have to restart Touch Portal or the plugin for it to receive the new inputs/outputs.~~
+  - added an action to update inputs/outputs/mics
 - Plugin has not been tested with Wave XLR because I do not have one.
 - 
 ## Features I would like to add:
