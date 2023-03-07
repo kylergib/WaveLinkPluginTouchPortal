@@ -1,6 +1,8 @@
 # WaveLinkPluginTouchPortal
 Wave Link Touch Portal Plugin
 
+## Java 8 may need to be installed for it to work properly.
+
 ## Actions:
 ### Input Actions:
 - Set Input Volume:
