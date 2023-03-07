@@ -9,9 +9,6 @@ import org.json.JSONObject;
 
 public abstract class WaveLinkActions {
 
-    public static void SetMicPcMix() {
-
-    }
 
     public static void setSwitchOutput() {
         actionSend(null, "switchOutput", 20);
@@ -76,7 +73,6 @@ public abstract class WaveLinkActions {
     public static void setMonitorMixOutput(String name) {
         String inputIdentifier = null;
         for (Output output: Status.allOutputs) {
-            System.out.println(output.getName() + " - " + output.getIdentifier());
             if (output.getName().equals(name)) {
                 inputIdentifier = output.getIdentifier();
                 output.setSelected(true);
@@ -89,6 +85,7 @@ public abstract class WaveLinkActions {
         params.put("identifier",inputIdentifier);
         params.put("name", name);
         actionSend(params,"setSelectedOutput", 12);
+        Status.selectedOutputFinished = name;
     }
 
     private static void actionSend(JSONObject params, String method, int id) {
