@@ -20,6 +20,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public static WaveLinkClient client;
     public static WaveLinkPlugin waveLinkPlugin;
     public final static Logger LOGGER = Logger.getLogger(TouchPortalPlugin.class.getName());
+
     private enum Categories {
         /**
          * Category definitions
