@@ -1,7 +1,6 @@
 package com.kylergib.wavelinktp.model;
 
 import com.kylergib.wavelinktp.WaveLinkPlugin;
-import com.kylergib.wavelinktp.WaveLinkPluginConstants;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.json.JSONObject;
@@ -130,6 +129,7 @@ public class WaveLinkClient extends WebSocketClient {
             } else if (method.equals("inputsChanged")) {
                 WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
                 send(getInputConfigs.getJsonString());
+                WaveLinkPlugin.waveLinkPlugin.updateInputs();
 
             } else if (method.equals("filterRemoved")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
@@ -196,6 +196,7 @@ public class WaveLinkClient extends WebSocketClient {
                 for (Output output: Status.allOutputs) {
                     if (output.getIdentifier().equals(outputIdentifier)) {
                         Status.currentOutputLocal = output;
+                        Status.selectedOutput = output.getName();
                     }
                 }
             } else if (method.equals("microphoneConfigChanged")) {
@@ -220,6 +221,7 @@ public class WaveLinkClient extends WebSocketClient {
                         input.setAvailable(false);
                     }
                 }
+                WaveLinkPlugin.waveLinkPlugin.updateMics();
             } else if (method.equals("inputEnabled")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
                 String identifier = (String) params.get("identifier");
@@ -228,6 +230,7 @@ public class WaveLinkClient extends WebSocketClient {
                         input.setAvailable(true);
                     }
                 }
+                WaveLinkPlugin.waveLinkPlugin.updateMics();
             }
         }
 
