@@ -62,63 +62,70 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     } catch (InterruptedException ignored) {
                     }
 
+                    waveLinkPlugin.connectToWaveLink();
 
-                    WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
 
-                    //start port at 1824, if wave link is not on 1824 it will connect to the next point and then stop at 1835.
-                    int port = 1824;
-                    client = new WaveLinkClient(ipSetting, port);
-                    while (true) {
-                        latch.await();
-                        if (client.isConnected != 1) {
-                            if (port < 1835) {
-                                port = port + 1;
-                                client = new WaveLinkClient(ipSetting, port);
-                                latch = new CountDownLatch(1);
-                            } else {
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    latch = new CountDownLatch(1);
-                    WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
-                    SwitchState localSwitch = new SwitchState("com.elgato.mix.local", null, -1);
-                    SwitchState streamSwitch = new SwitchState("com.elgato.mix.stream", null, -1);
-                    Status.switchStates.add(localSwitch);
-                    Status.switchStates.add(streamSwitch);
-                    Status.switchMap.put("localMixer", "com.elgato.mix.local");
-                    Status.switchMap.put("streamMixer", "com.elgato.mix.stream");
 
-                    //sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
-                    WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
-                    client.send(getAppInfo.getJsonString());
-                    WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
-                    client.send(getMicrophoneConfig.getJsonString());
-                    WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
-                    client.send(getSwitchState.getJsonString());
-                    WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
-                    client.send(getOutputConfig.getJsonString());
-                    WaveJson getOutputs = new WaveJson("getOutputs", 15);
-                    client.send(getOutputs.getJsonString());
-                    WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
-                    client.send(getInputConfigs.getJsonString());
 
-                    // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
-                    WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
-                    while (true) {
-                        if (client.configsReceived == 6) {
-                            break;
-                        } else {
-                            Thread.sleep(100);
-                        }
-                    }
-                    WaveLinkPlugin.LOGGER.log(Level.INFO, "Received all Wave Link configs");
-                    waveLinkPlugin.actionUpdatePuts();
+
                 }
             }
         }
+    }
+    @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
+    private void connectToWaveLink() throws Exception {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
+        //start port at 1824, if wave link is not on 1824 it will connect to the next point and then stop at 1835.
+        int port = 1824;
+        client = new WaveLinkClient(ipSetting, port);
+        while (true) {
+            latch.await();
+            if (client.isConnected != 1) {
+                if (port < 1829) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
+                    port = port + 1;
+                    client = new WaveLinkClient(ipSetting, port);
+                    latch = new CountDownLatch(1);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        latch = new CountDownLatch(1);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
+        SwitchState localSwitch = new SwitchState("com.elgato.mix.local", null, -1);
+        SwitchState streamSwitch = new SwitchState("com.elgato.mix.stream", null, -1);
+        Status.switchStates.add(localSwitch);
+        Status.switchStates.add(streamSwitch);
+        Status.switchMap.put("localMixer", "com.elgato.mix.local");
+        Status.switchMap.put("streamMixer", "com.elgato.mix.stream");
+
+        //sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
+        WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+        client.send(getAppInfo.getJsonString());
+        WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
+        client.send(getMicrophoneConfig.getJsonString());
+        WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
+        client.send(getSwitchState.getJsonString());
+        WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
+        client.send(getOutputConfig.getJsonString());
+        WaveJson getOutputs = new WaveJson("getOutputs", 15);
+        client.send(getOutputs.getJsonString());
+        WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
+        client.send(getInputConfigs.getJsonString());
+
+        // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
+        while (true) {
+            if (client.configsReceived == 6) {
+                break;
+            } else {
+                Thread.sleep(100);
+            }
+        }
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Received all Wave Link configs");
+        waveLinkPlugin.actionUpdatePuts();
     }
 
 

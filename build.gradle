@@ -8,7 +8,7 @@ plugins {
 def mainClassSimpleName = 'WaveLinkPlugin'
 def mainClassPackage = 'com.kylergib.wavelinktp'
 group mainClassPackage
-version '1.0.3'
+version '1.0.4'
 
 tpPlugin.mainClassSimpleName = mainClassSimpleName
 
@@ -21,7 +21,7 @@ buildConfig {
 
     buildConfigField 'String', 'NAME', "\"${project.name}\""
     buildConfigField 'String', 'VERSION_NAME', "\"${version}\""
-    buildConfigField 'long', 'VERSION_CODE', 103 + ''
+    buildConfigField 'long', 'VERSION_CODE', 104 + ''
 }
 
 dependencies {

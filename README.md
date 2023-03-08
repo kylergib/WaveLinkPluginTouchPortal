@@ -19,6 +19,8 @@ Wave Link Touch Portal Plugin
   - true means that the input will bypass the filter
 
 ### Output Actions:
+- Connect/Reconnect to Wave Link
+  - Can be used to retry to connect to Wave Link if Wave Link was closed when TP launched, or if Wave Link needed to be restarted.
 - Mute/Unmute output:
   - Mute/unmute or toggle; for monitor mix or stream mix.
   - Target either the Monitor Mix, Stream Mix or both.
