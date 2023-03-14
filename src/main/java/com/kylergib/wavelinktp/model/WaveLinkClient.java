@@ -9,6 +9,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.logging.Level;
 
+
 /**
  * Client that connects to wave link through sockets
  */
@@ -19,6 +20,7 @@ public class WaveLinkClient extends WebSocketClient {
     private String host;
     public int configsReceived = 0;
 
+    private WaveLinkCallback configCallback;
 
     public WaveLinkClient(String ipAddress, int port) throws Exception {
         super(new URI("ws://" + ipAddress + ":" + port));
@@ -28,6 +30,7 @@ public class WaveLinkClient extends WebSocketClient {
         connect();
 
     }
+
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Connected to Wave Link");
@@ -67,6 +70,11 @@ public class WaveLinkClient extends WebSocketClient {
                 Status.getInput();
                 configsReceived = configsReceived + 1;
             }
+            if (configsReceived == 6) {
+                configCallback.onConfigsReceived();
+                configsReceived = 0;
+            }
+
         } else {
 
             //these messages are from when something is changed in the wave link app outside of TP
@@ -79,10 +87,10 @@ public class WaveLinkClient extends WebSocketClient {
                 Boolean value = (Boolean) params.get("value");
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerId.equals("com.elgato.mix.local")) {
+                        if (mixerId.equals(Status.localPackageName)) {
                             input.setLocalMixerMuted(value);
 
-                        } else if (mixerId.equals("com.elgato.mix.stream")) {
+                        } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerMuted(value);
                         }
                     }
@@ -94,9 +102,9 @@ public class WaveLinkClient extends WebSocketClient {
                 int value = (Integer) params.get("value");
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerId.equals("com.elgato.mix.local") && input.getLocalMixerLevel() != value) {
+                        if (mixerId.equals(Status.localPackageName) && input.getLocalMixerLevel() != value) {
                             input.setLocalMixerLevel(value);
-                        } else if (mixerId.equals("com.elgato.mix.stream")) {
+                        } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerLevel(value);
                         }
 
@@ -183,9 +191,9 @@ public class WaveLinkClient extends WebSocketClient {
                 Boolean value = (Boolean) params.get("value");
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerID.equals("com.elgato.mix.local")) {
+                        if (mixerID.equals(Status.localPackageName)) {
                             input.setPluginBypassLocal(value);
-                        } else if (mixerID.equals("com.elgato.mix.stream")) {
+                        } else if (mixerID.equals(Status.streamPackageName)) {
                             input.setPluginBypassStream(value);
                         }
                     }
@@ -246,9 +254,16 @@ public class WaveLinkClient extends WebSocketClient {
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, "Error connecting to wave link");
+        WaveLinkPlugin.LOGGER.log(Level.SEVERE, ex.toString());
 
     }
+
+    public void setConfigCallback(WaveLinkCallback configCallback) {
+        this.configCallback = configCallback;
+    }
+
+
+
 }
 
 

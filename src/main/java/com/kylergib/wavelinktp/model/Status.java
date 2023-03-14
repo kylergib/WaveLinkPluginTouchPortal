@@ -21,7 +21,7 @@ public abstract class Status {
     public static JSONObject microphoneConfig;
 
     //i think this is what the output is listening to on bottom right hand corner of wavelink
-    public static JSONObject switchState; //returns {"id":13,"result":{"value":"com.elgato.mix.local"}}
+    public static JSONObject switchState;
     public static ArrayList<SwitchState> switchStates = new ArrayList<>();
     public static HashMap<String, String> switchMap = new HashMap<>();
 
@@ -43,6 +43,9 @@ public abstract class Status {
     public static Output currentOutputLocal;
 
     public static String currentOutputSwitch;
+
+    public static final String localPackageName = "com.elgato.mix.local";
+    public static final String streamPackageName = "com.elgato.mix.stream";
 
     public static void getSwitchState() {
         // what you are listening to in bottom right hand corner of wave link

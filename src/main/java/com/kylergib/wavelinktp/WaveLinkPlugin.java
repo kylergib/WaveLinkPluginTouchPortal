@@ -14,12 +14,15 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
+
+
 @Plugin(version = BuildConfig.VERSION_CODE, colorDark = "#203060", colorLight = "#4070F0", name = "Wave Link Plugin")
-public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener {
+public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener, WaveLinkCallback {
     public static CountDownLatch latch = new CountDownLatch(1);
     public static WaveLinkClient client;
     public static WaveLinkPlugin waveLinkPlugin;
     public final static Logger LOGGER = Logger.getLogger(TouchPortalPlugin.class.getName());
+
 
     private enum Categories {
         /**
@@ -52,31 +55,22 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (PluginHelper.COMMAND_START.equals(args[0])) {
                 // Initialize the Plugin
                 waveLinkPlugin = new WaveLinkPlugin();
+                waveLinkPlugin.connectThenPairAndListen(waveLinkPlugin);
 
-                boolean connectedPairedAndListening = waveLinkPlugin.connectThenPairAndListen(waveLinkPlugin);
-                if (connectedPairedAndListening) {
-
-
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {
-                    }
-
-                    waveLinkPlugin.connectToWaveLink();
-
-
-
-
-
-                }
             }
         }
     }
-    @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
+    //    @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
     private void connectToWaveLink() throws Exception {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
         //start port at 1824, if wave link is not on 1824 it will connect to the next point and then stop at 1835.
+
         int port = 1824;
+        //checks if client is already initialized and open and closes so that it can attempt to reconnect.
+        if (client != null && client.isOpen()) {
+            client.close();
+            WaveLinkPlugin.LOGGER.log(Level.INFO, "Closed previous connection to Wave Link");
+        }
         client = new WaveLinkClient(ipSetting, port);
         while (true) {
             latch.await();
@@ -92,14 +86,15 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 break;
             }
         }
-        latch = new CountDownLatch(1);
+
+        client.setConfigCallback(waveLinkPlugin);
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
-        SwitchState localSwitch = new SwitchState("com.elgato.mix.local", null, -1);
-        SwitchState streamSwitch = new SwitchState("com.elgato.mix.stream", null, -1);
+        SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1);
+        SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1);
         Status.switchStates.add(localSwitch);
         Status.switchStates.add(streamSwitch);
-        Status.switchMap.put("localMixer", "com.elgato.mix.local");
-        Status.switchMap.put("streamMixer", "com.elgato.mix.stream");
+        Status.switchMap.put("localMixer", Status.localPackageName);
+        Status.switchMap.put("streamMixer", Status.streamPackageName);
 
         //sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
         WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
@@ -117,15 +112,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
         // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
-        while (true) {
-            if (client.configsReceived == 6) {
-                break;
-            } else {
-                Thread.sleep(100);
-            }
-        }
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Received all Wave Link configs");
-        waveLinkPlugin.actionUpdatePuts();
+
     }
 
 
@@ -138,32 +125,32 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             Boolean setMute = null;
 
             //if mixerID is local or both, then it will mute/unmute. if set to toggle it will just toggle it.
-            if (switchState.getMixerId().equals("com.elgato.mix.local") && (mixerId[0].equals("Both") || mixerId[0].equals("Local"))) {
+            if (switchState.getMixerId().equals(Status.localPackageName) && (mixerId[0].equals("Both") || mixerId[0].equals("Local"))) {
                 if (value[0].equals("toggle")) {
                     setMute = !switchState.getMuted();
                 } else {
                     setMute = Boolean.valueOf(value[0]);
                 }
                 String localMute = "unmuted";
-                if (!setMute) {
+                if (setMute) {
                     localMute = "muted";
                 }
-                WaveLinkActions.setOutputConfig("com.elgato.mix.local","Output Mute",setMute);
+                WaveLinkActions.setOutputConfig(Status.localPackageName,"Output Mute",setMute);
                 switchState.setMuted(setMute);
                 waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalMixOut.ID,localMute);
 
                 //if mixerID is stream or both, then it will mute/unmute. if set to toggle it will just toggle it.
-            } else if (switchState.getMixerId().equals("com.elgato.mix.stream") && (mixerId[0].equals("Both") || mixerId[0].equals("Stream"))) {
+            } else if (switchState.getMixerId().equals(Status.streamPackageName) && (mixerId[0].equals("Both") || mixerId[0].equals("Stream"))) {
                 if (value[0].equals("toggle")) {
                     setMute = !switchState.getMuted();
                 } else {
                     setMute = Boolean.valueOf(value[0]);
                 }
                 String streamMute = "unmuted";
-                if (!setMute) {
+                if (setMute) {
                     streamMute = "muted";
                 }
-                WaveLinkActions.setOutputConfig("com.elgato.mix.stream","Output Mute",setMute);
+                WaveLinkActions.setOutputConfig(Status.streamPackageName,"Output Mute",setMute);
                 switchState.setMuted(setMute);
                 waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID,streamMute);
             }
@@ -200,10 +187,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + outputMixerId[0] + " - " + volumeValue);
 
         if (outputMixerId[0].equals("Local") || outputMixerId[0].equals("Both")) {
-            WaveLinkActions.setOutputConfig("com.elgato.mix.local","Output Level",volumeValue);
+            WaveLinkActions.setOutputConfig(Status.localPackageName,"Output Level",volumeValue);
         }
         if (outputMixerId[0].equals("Stream") || outputMixerId[0].equals("Both")) {
-            WaveLinkActions.setOutputConfig("com.elgato.mix.stream","Output Level",volumeValue);
+            WaveLinkActions.setOutputConfig(Status.streamPackageName,"Output Level",volumeValue);
         }
     }
     @Action(format = "Switch which mix you are monitoring (Local or Stream)\nThe active output being monitored is highlighted in greet ot the bottom right of Wave Link",
@@ -213,12 +200,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         WaveLinkActions.setSwitchOutput();
 
         String monitorValue = null;
-        if (Status.switchStateValue.equals("com.elgato.mix.local")) {
+        if (Status.switchStateValue.equals(Status.localPackageName)) {
             monitorValue = "stream";
-            Status.switchStateValue = "com.elgato.mix.stream";
+            Status.switchStateValue = Status.streamPackageName;
         } else {
             monitorValue = "local";
-            Status.switchStateValue = "com.elgato.mix.local";
+            Status.switchStateValue = Status.localPackageName;
         }
 
         waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.MonitoredMix.ID, monitorValue);
@@ -244,7 +231,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     } else {
                         setFilter = Boolean.valueOf(value[0]);
                     }
-                    WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, "com.elgato.mix.local");
+                    WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, Status.localPackageName);
                     input.setPluginBypassLocal(setFilter);
                 }
                 if (mixerId[0].equals("Both") || mixerId[0].equals("Stream")) {
@@ -257,7 +244,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     } else {
                         setFilter = Boolean.valueOf(value[0]);
                     }
-                    WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, "com.elgato.mix.stream");
+                    WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, Status.streamPackageName);
                     input.setPluginBypassStream(setFilter);
                 }
             }
@@ -288,10 +275,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     } else {
                         newValueLocal = Boolean.valueOf(value[0]);
                     }
-                    WaveLinkActions.setInputConfig(input.getIdentifier(), "com.elgato.mix.local", "Mute", newValueLocal);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(), Status.localPackageName, "Mute", newValueLocal);
                     input.setLocalMixerMuted(newValueLocal);
                     String mutedValue = "unmuted";
-                    if (!newValueLocal) {
+                    if (newValueLocal) {
                         mutedValue = "muted";
                     }
                     String inputStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInput.state." + input.getName() + "Local";
@@ -309,10 +296,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                         newValueStream = Boolean.valueOf(value[0]);
                     }
                     String mutedValue = "unmuted";
-                    if (!newValueStream) {
+                    if (newValueStream) {
                         mutedValue = "muted";
                     }
-                    WaveLinkActions.setInputConfig(input.getIdentifier(), "com.elgato.mix.stream", "Mute", newValueStream);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Mute", newValueStream);
                     input.setStreamMixerMuted(newValueStream);
                     String inputStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInput.state." + input.getName() + "Stream";
                     waveLinkPlugin.sendStateUpdate(inputStateId, mutedValue);
@@ -342,11 +329,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             // if input is selected for choices it will set the volume of that to the integerValue on the selected mixerId
             if (input.getName().equals(choices[0])) {
                 if (mixerId[0].equals("Local") || mixerId[0].equals("Both")) {
-                    WaveLinkActions.setInputConfig(input.getIdentifier(),"com.elgato.mix.local","Volume",integerValue);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume",integerValue);
                     input.setLocalMixerLevel(integerValue);
                 }
                 if (mixerId[0].equals("Stream") || mixerId[0].equals("Both")) {
-                    WaveLinkActions.setInputConfig(input.getIdentifier(), "com.elgato.mix.stream", "Volume", integerValue);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", integerValue);
                     input.setStreamMixerLevel(integerValue);
                 }
             }
@@ -420,12 +407,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.OutputList.ID, allOutputsString);
 
         String monitorValue = null;
-        if (Status.switchStateValue.equals("com.elgato.mix.local")) {
+        if (Status.switchStateValue.equals(Status.localPackageName)) {
             monitorValue = "stream";
-            Status.switchStateValue = "com.elgato.mix.stream";
+            Status.switchStateValue = Status.streamPackageName;
         } else {
             monitorValue = "local";
-            Status.switchStateValue = "com.elgato.mix.local";
+            Status.switchStateValue = Status.localPackageName;
         }
         waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.MonitoredMix.ID, monitorValue);
     }
@@ -524,10 +511,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     private void outputVolumeConnector(@ConnectorValue Integer volumeValue, @Data (valueChoices = {"Local","Stream","Both"}) String[] outputMixerId) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector outputVolumeConnector received: " + volumeValue + " - " + outputMixerId[0]);
         if (outputMixerId[0].equals("Local") || outputMixerId[0].equals("Both")) {
-            WaveLinkActions.setOutputConfig("com.elgato.mix.local","Output Level",volumeValue);
+            WaveLinkActions.setOutputConfig(Status.localPackageName,"Output Level",volumeValue);
         }
         if (outputMixerId[0].equals("Stream") || outputMixerId[0].equals("Both")) {
-            WaveLinkActions.setOutputConfig("com.elgato.mix.stream","Output Level",volumeValue);
+            WaveLinkActions.setOutputConfig(Status.streamPackageName,"Output Level",volumeValue);
         }
 
     }
@@ -541,10 +528,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         for (Input input: Status.allInputs) {
             if (input.getName().equals(choices[0])) {
                 if (mixerId[0].equals("Local") || mixerId[0].equals("Both")) {
-                    WaveLinkActions.setInputConfig(input.getIdentifier(),"com.elgato.mix.local","Volume",value);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume",value);
                 }
                 if (mixerId[0].equals("Stream") || mixerId[0].equals("Both")) {
-                    WaveLinkActions.setInputConfig(input.getIdentifier(),"com.elgato.mix.stream","Volume",value);
+                    WaveLinkActions.setInputConfig(input.getIdentifier(),Status.streamPackageName,"Volume",value);
                 }
             }
         }
@@ -610,6 +597,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when the Info Message is received when Touch Portal confirms our initial connection is successful
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
+        try {
+            waveLinkPlugin.connectToWaveLink();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
     }
 
@@ -627,6 +619,17 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when a Settings Message is received
      */
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
+//        System.out.println(client.isOpen());
+//        if (client.isOpen()) {
+//            client.close();
+//            WaveLinkPlugin.LOGGER.log(Level.INFO, "Closing previous connection to Wave Link");
+//        }
+        try {
+            waveLinkPlugin.connectToWaveLink();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -634,5 +637,13 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     }
 
+    /**
+     * Called when plugin receives all the configs needed from Wave Link
+     */
+    @Override
+    public void onConfigsReceived() {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Received all Wave Link configs");
+        waveLinkPlugin.actionUpdatePuts();
+    }
 
 }
