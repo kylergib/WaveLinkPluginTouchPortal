@@ -1,5 +1,7 @@
 package com.kylergib.wavelinktp.model;
 
+import com.kylergib.wavelinktp.WaveLinkPlugin;
+import com.kylergib.wavelinktp.WaveLinkPluginConstants;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -47,10 +49,21 @@ public abstract class Status {
     public static final String localPackageName = "com.elgato.mix.local";
     public static final String streamPackageName = "com.elgato.mix.stream";
 
+    public static ArrayList<String> sentStates = new ArrayList<>();
+
     public static void getSwitchState() {
         // what you are listening to in bottom right hand corner of wave link
         JSONObject result = (JSONObject) switchState.get("result");
         switchStateValue = (String) result.get("value");
+
+        String monitorValue = null;
+        if (switchStateValue.equals(Status.streamPackageName)) {
+            monitorValue = "Stream";
+        } else {
+            monitorValue = "Local";
+        }
+        WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.MonitoredMix.ID, monitorValue);
+        System.out.println("THIS IS SWITCH STATE NEW " + switchStateValue + " - " + monitorValue);
 
     }
 
@@ -64,15 +77,25 @@ public abstract class Status {
         Boolean localMixerMuted = (Boolean) localMixer.get(0);
         int localMixerLevel = (int) localMixer.get(1);
 
-
-
         for (SwitchState switchState: switchStates) {
             if (switchState.getMixerId().equals(switchMap.get("localMixer"))) {
                 switchState.setLevel(localMixerLevel);
                 switchState.setMuted(localMixerMuted);
+                String sendMute = "unmuted";
+                if (localMixerMuted) {
+                    sendMute = "muted";
+                }
+                setOutputValue(localMixerLevel,"Local");
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalMixOut.ID,sendMute);
             } else if (switchState.getMixerId().equals(switchMap.get("streamMixer"))) {
                 switchState.setLevel(streamMixerLevel);
                 switchState.setMuted(streamMixerMuted);
+                String sendMute = "unmuted";
+                if (localMixerMuted) {
+                    sendMute = "muted";
+                }
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID,sendMute);
+                setOutputValue(streamMixerLevel, "Stream");
             }
 
         }
@@ -195,6 +218,20 @@ public abstract class Status {
 
 
         }
+
+    }
+
+    public static void setInputValue(String inputName, int value, String mixerName) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector.data.mixerId", mixerName);
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", inputName);
+        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID,value,data);
+    }
+
+    public static void setOutputValue(int value, String mixerName) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.connector.outputVolumeConnector.data.outputMixerId", mixerName);
+        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
 
     }
 
