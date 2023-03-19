@@ -1,43 +1,48 @@
 package com.kylergib.wavelinktp.model;
 
 import com.kylergib.wavelinktp.WaveLinkPlugin;
+import com.kylergib.wavelinktp.WaveLinkPluginConstants;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.json.JSONObject;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.logging.Level;
+
 
 /**
  * Client that connects to wave link through sockets
  */
 
 public class WaveLinkClient extends WebSocketClient {
-    public int isConnected = 0;
     private int port;
     private String host;
-    public int configsReceived = 0;
+    private int configsReceived;
 
+    private WaveLinkCallback configCallback;
 
     public WaveLinkClient(String ipAddress, int port) throws Exception {
         super(new URI("ws://" + ipAddress + ":" + port));
         this.port = port;
         this.host = ipAddress;
+        this.configsReceived = 0;
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to: " + ipAddress + " using port: " + port);
         connect();
 
     }
+
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connected to Wave Link");
-        isConnected = 1;
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connected to Wave Link on Port: " + port);
         WaveLinkPlugin.latch.countDown();
     }
 
     //chooses what to do when client receives messages from wave link
     @Override
     public void onMessage(String message) {
+        System.out.println(message);
         JSONObject newReceive = new JSONObject(message);
         if (newReceive.keySet().contains("id")) {
             //id in message matches what the client sent from WaveLinkPlugin class
@@ -67,10 +72,15 @@ public class WaveLinkClient extends WebSocketClient {
                 Status.getInput();
                 configsReceived = configsReceived + 1;
             }
+            if (configsReceived == 6) {
+                configCallback.onConfigsReceived();
+                configsReceived = 0;
+            }
+
         } else {
 
             //these messages are from when something is changed in the wave link app outside of TP
-            //auto sending to TP was not working
+
             String method = (String) newReceive.get("method");
             if (method.equals("inputMuteChanged")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
@@ -79,11 +89,19 @@ public class WaveLinkClient extends WebSocketClient {
                 Boolean value = (Boolean) params.get("value");
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerId.equals("com.elgato.mix.local")) {
+                        String sendMute = "unmuted";
+                        if (value) {
+                            sendMute = "muted";
+                        }
+                        if (mixerId.equals(Status.localPackageName)) {
                             input.setLocalMixerMuted(value);
 
-                        } else if (mixerId.equals("com.elgato.mix.stream")) {
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Local",sendMute);
+
+
+                        } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerMuted(value);
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Stream",sendMute);
                         }
                     }
                 }
@@ -92,12 +110,16 @@ public class WaveLinkClient extends WebSocketClient {
                 String inputIdentifier = (String) params.get("identifier");
                 String mixerId = (String) params.get("mixerID");
                 int value = (Integer) params.get("value");
+
+                //TODO: make this shorter
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerId.equals("com.elgato.mix.local") && input.getLocalMixerLevel() != value) {
+                        if (mixerId.equals(Status.localPackageName) && input.getLocalMixerLevel() != value) {
                             input.setLocalMixerLevel(value);
-                        } else if (mixerId.equals("com.elgato.mix.stream")) {
+                            Status.setInputValue(input.getName(),value,"Local");
+                        } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerLevel(value);
+                            Status.setInputValue(input.getName(),value,"Stream");
                         }
 
                     }
@@ -105,6 +127,14 @@ public class WaveLinkClient extends WebSocketClient {
             } else if (method.equals("outputSwitched")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
                 Status.switchStateValue = (String) params.get("value");
+                System.out.println(params);
+                String monitorValue = null;
+                if (Status.switchStateValue.equals(Status.streamPackageName)) {
+                    monitorValue = "Stream";
+                } else {
+                    monitorValue = "Local";
+                }
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.MonitoredMix.ID, monitorValue);
 
             } else if (method.equals("outputMuteChanged")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
@@ -113,6 +143,15 @@ public class WaveLinkClient extends WebSocketClient {
                 for (SwitchState switchState : Status.switchStates) {
                     if (switchState.getMixerId().equals(mixerId)) {
                         switchState.setMuted(value);
+                        String sendMute = "unmuted";
+                        if (switchState.getMuted()) {
+                            sendMute = "muted";
+                        }
+                        if (switchState.getMixerName().equals("Local")) {
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalMixOut.ID, sendMute);
+                        } else {
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID, sendMute);
+                        }
                     }
 
                 }
@@ -123,13 +162,18 @@ public class WaveLinkClient extends WebSocketClient {
                 for (SwitchState switchState : Status.switchStates) {
                     if (switchState.getMixerId().equals(mixerId)) {
                         switchState.setLevel(value);
+                        Status.setOutputValue(value, switchState.getMixerName());
                     }
                 }
 
             } else if (method.equals("inputsChanged")) {
                 WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
                 send(getInputConfigs.getJsonString());
-                WaveLinkPlugin.waveLinkPlugin.updateInputs();
+                try {
+                    WaveLinkPlugin.waveLinkPlugin.updateInputs();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
 
             } else if (method.equals("filterRemoved")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
@@ -143,7 +187,6 @@ public class WaveLinkClient extends WebSocketClient {
                             if (!plugin.getFilterID().equals(filterID)) {
                                 newPlugins.add(plugin);
 
-                            } else {
                             }
                         }
                         input.setPlugins(newPlugins);
@@ -165,7 +208,7 @@ public class WaveLinkClient extends WebSocketClient {
                                 allPlugins.add(plugin);
                             }
                         }
-                        if (pluginAlreadyAdded == false) {
+                        if (!pluginAlreadyAdded) {
                             InputPlugin newPlugin = new InputPlugin((String) params.get("filterID"),
                                     pluginID, (String) params.get("name"),
                                     (Boolean) params.get("isActive"));
@@ -183,9 +226,9 @@ public class WaveLinkClient extends WebSocketClient {
                 Boolean value = (Boolean) params.get("value");
                 for (Input input: Status.allInputs) {
                     if (input.getIdentifier().equals(inputIdentifier)) {
-                        if (mixerID.equals("com.elgato.mix.local")) {
+                        if (mixerID.equals(Status.localPackageName)) {
                             input.setPluginBypassLocal(value);
-                        } else if (mixerID.equals("com.elgato.mix.stream")) {
+                        } else if (mixerID.equals(Status.streamPackageName)) {
                             input.setPluginBypassStream(value);
                         }
                     }
@@ -195,8 +238,10 @@ public class WaveLinkClient extends WebSocketClient {
                 String outputIdentifier = (String) params.get("value");
                 for (Output output: Status.allOutputs) {
                     if (output.getIdentifier().equals(outputIdentifier)) {
+                        //TODO: make this cleaner, as i think setting both these is redundant
                         Status.currentOutputLocal = output;
                         Status.selectedOutput = output.getName();
+                        WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.state.selectedOutput",output.getName());
                     }
                 }
             } else if (method.equals("microphoneConfigChanged")) {
@@ -240,15 +285,23 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "WebSocket connection closed: " + reason);
-        isConnected = -1;
         WaveLinkPlugin.latch.countDown();
     }
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, "Error connecting to wave link");
+        WaveLinkPlugin.LOGGER.log(Level.SEVERE, ex.toString());
 
     }
+
+    public void setConfigCallback(WaveLinkCallback configCallback) {
+        this.configCallback = configCallback;
+    }
+
+
+
+
+
 }
 
 
