@@ -1,6 +1,13 @@
 # WaveLinkPluginTouchPortal
 Wave Link Touch Portal Plugin
 
+### This is Wave Link Example.tpz in releases
+![IMG_0031](https://user-images.githubusercontent.com/48994502/226190178-9b502275-4cf4-42e0-a71e-fb969b4e5ad3.jpeg)
+
+### This is Wave Link Output Monitor.tpz in releases. If you use this page the change outputs button on above example opens this page and you select the output to switch to and it automatically goes back to previous page. 
+![IMG_0033](https://user-images.githubusercontent.com/48994502/226190194-b0b8dc4f-5e18-425a-a7f5-6cc9efc56aa5.jpeg)
+
+
 ## Java 8 may need to be installed for it to work properly.
 
 ## Actions:
@@ -64,7 +71,6 @@ Wave Link Touch Portal Plugin
 
 
 ## Connectors:
-#### Known issue with Touch Portal. Refreshing the page works most of the time, but have had to restart Touch Portal completely to fix.
 - Input Volume: 
   - Connects the slider to the what input you choose. 
   - Target either the monitor mix, stream mix or both.
