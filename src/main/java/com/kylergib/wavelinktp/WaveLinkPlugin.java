@@ -320,10 +320,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (isLocalMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume",integerValue);
                 input.setLocalMixerLevel(integerValue);
+                Status.setInputValue(input.getName(),integerValue,"Local");
             }
             if (isStreamMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", integerValue);
                 input.setStreamMixerLevel(integerValue);
+                Status.setInputValue(input.getName(),integerValue,"Stream");
             }
         });
     }
