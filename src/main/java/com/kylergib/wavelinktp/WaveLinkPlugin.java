@@ -9,6 +9,8 @@ import com.christophecvb.touchportal.model.*;
 import com.google.gson.JsonObject;
 import com.kylergib.wavelinktp.model.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -447,9 +449,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
                 .WaveLinkInputs.States.InputList.ID, allInputsString);
 
-        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
-                .WaveLinkInputs.States.FilterList.ID, Status.allFilters.toArray(new String[0]));
-
     }
 
     public void updateInputValues() {
@@ -711,7 +710,27 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     /**
      * Called when a List Change Message is received
      */
-    public void onListChanged(TPListChangeMessage tpListChangeMessage) { }
+    public void onListChanged(TPListChangeMessage tpListChangeMessage) {
+
+
+        if (tpListChangeMessage.actionId.equals(
+                "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.action.actionSetInputFilterActive")) {
+            String inputName = tpListChangeMessage.value;
+            List<String> filterList = new ArrayList<>();
+
+            Status.allInputs.stream().filter(input -> isInput(input,inputName)).forEach(input -> {
+                input.getPlugins().forEach(inputPlugin -> {
+                    filterList.add(inputPlugin.getName());
+                });
+            });
+
+            waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                    .WaveLinkInputs.States.FilterList.ID, filterList.toArray(new String[0]), true);
+//            }
+        }
+
+
+    }
 
     /**
      * Called when a Broadcast Message is received
