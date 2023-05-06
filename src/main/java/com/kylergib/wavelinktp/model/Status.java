@@ -14,6 +14,7 @@ import java.util.HashMap;
 
 public abstract class Status {
     //info about app, probably just need this for debugging
+    //TODO: clean up
     public static JSONObject applicationInfo;
     public static String selectedOutput;
     public static String selectedOutputFinished;
@@ -35,6 +36,7 @@ public abstract class Status {
 
     public static ArrayList<Output> allOutputs = new ArrayList<>();
     public static ArrayList<Input> allInputs = new ArrayList<>();
+    public static ArrayList<String> allFilters = new ArrayList<>();
     public static ArrayList<Microphone> allMics = new ArrayList<>();
 
     public static OutputConfig outputStatus;
@@ -50,6 +52,7 @@ public abstract class Status {
     public static final String streamPackageName = "com.elgato.mix.stream";
 
     public static ArrayList<String> sentStates = new ArrayList<>();
+
 
     public static void getSwitchState() {
         // what you are listening to in bottom right hand corner of wave link
@@ -105,12 +108,12 @@ public abstract class Status {
     }
 
     public static void getInput() {
-        //TODO: does not update when an input is removed
         //TODO: possible to get icon data and import icon?
         if (!allInputs.isEmpty()) {
             allInputs.clear();
         }
         int id = (int) inputConfigs.get("id");
+        System.out.println("INPUT CONFIGS" + inputConfigs.toString());
         JSONArray resultJson = (JSONArray) inputConfigs.get("result");
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
@@ -118,7 +121,6 @@ public abstract class Status {
             String name = (String) tempJson.get("name");
             Boolean isAvailable = (Boolean) tempJson.get("isAvailable");
 
-            //LEFTOFF
             JSONArray streamMixer = (JSONArray) tempJson.get("streamMixer"); //isMuted, level, unknown
             Boolean streamMixerMuted = (Boolean) streamMixer.get(0);
             int streamMixerLevel = (Integer) streamMixer.get(1);
@@ -144,6 +146,9 @@ public abstract class Status {
                     Boolean isActive = (Boolean) tempPlugin.get("isActive");
                     InputPlugin newPlugin = new InputPlugin(filterId,pluginId,pluginName,isActive);
                     inputPlugins.add(newPlugin);
+                    if (!allFilters.contains(pluginName)) {
+                        allFilters.add(pluginName);
+                    }
                 }
             } catch (JSONException ignored) {
             }

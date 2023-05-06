@@ -259,6 +259,7 @@ public class WaveLinkClient extends WebSocketClient {
                     }
                 }
             } else if (method.equals("inputDisabled")) {
+                //TODO: see if what this does ?
                 JSONObject params = (JSONObject) newReceive.get("params");
                 String identifier = (String) params.get("identifier");
                 for (Input input: Status.allInputs) {
@@ -276,6 +277,28 @@ public class WaveLinkClient extends WebSocketClient {
                     }
                 }
                 WaveLinkPlugin.waveLinkPlugin.updateMics();
+            } else if (method.equals("filterChanged")) {
+                JSONObject params = (JSONObject) newReceive.get("params");
+                String identifier = (String) params.get("identifier"); //input id
+                String filterId = (String) params.get("filterID"); //filter id
+                boolean filterActive = (boolean) params.get("value");
+                String stateValue;
+                if (filterActive) stateValue = "active";
+                else stateValue = "inactive";
+                for (Input input: Status.allInputs) {
+                    if (input.getIdentifier().equals(identifier)) {
+                        for (InputPlugin inputPlugin: input.getPlugins()) {
+                            if (inputPlugin.getFilterID().equals(filterId)) {
+                                String stateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." +
+                                        input.getName().replace(" ","") + "Filter" + inputPlugin.getName();
+
+                                inputPlugin.setIsActive(filterActive);
+                                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(
+                                        stateId, stateValue);
+                            }
+                        }
+                    }
+                }
             }
         }
 

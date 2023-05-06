@@ -304,6 +304,55 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         });
     }
     /**
+     * Action to set input to be muted or not, can be toggled
+     *
+     * @param value Integer
+     * @param choices list of strings
+     * @param mixerId list of strings
+     */
+
+    @Action(description = "Set filter to be active/inactive for input", format = "Set input: {$choices$} for filter: {$filters$} to {$value$}",
+            categoryId = "WaveLinkInputs", name="Enable/Disable input filter")
+    private void actionSetInputFilterActive(@Data(stateId = "inputList")  String[] choices, @Data(valueChoices = {"true","false","toggle"}) String[] value,
+                                    @Data(stateId = "filterList")  String[] filters) {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputFilter received: " + value[0] + " - " + choices[0] +
+                " - " + filters[0]);
+        Status.allInputs.stream().filter(input -> isInput(input, choices[0])).forEach(input -> {
+
+
+
+                //below will only run if input has the filter
+                input.getPlugins().stream().filter(inputPlugin ->
+                        isInputPlugin(inputPlugin,filters[0]))
+                        .forEach(inputPlugin -> {
+
+                    Boolean newValue;
+                    if (value[0].equals("toggle")) {
+                        newValue = !inputPlugin.getIsActive();
+                    } else {
+                        newValue = Boolean.valueOf(value[0]);
+                    }
+                    System.out.println(String.format("%s", inputPlugin.getName(), inputPlugin.getIsActive()));
+                    System.out.println(String.format("%s", input.getName()));
+
+                    String stateId = input.getName().replace(" ","") + "Filter" + inputPlugin.getName();
+                    String stateIdValue;
+                    if (newValue) stateIdValue = "active";
+                    else stateIdValue = "inactive";
+
+
+
+
+                    inputPlugin.setIsActive(newValue);
+                    WaveLinkActions.setInputFilter(input.getIdentifier(),inputPlugin.getFilterID(),newValue);
+                            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + stateId,stateIdValue);
+                    System.out.println(stateId + " - " + stateIdValue);
+
+                });
+
+        });
+    }
+    /**
      * Action to set input volume to a specific integer
      *
      * @param integerValue Integer
@@ -373,12 +422,33 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
                 Status.sentStates.add(input.getName().replace(" ",""));
                 System.out.println("Sent state: " + input.getName().replace(" ",""));
+
+                //TODO: adding states for each input
+                //NEW
+                input.getPlugins().forEach(inputPlugin -> {
+                    String inputFilterStateId = input.getName().replace(" ", "") + "Filter" + inputPlugin.getName();
+                    String inputFilterStateDescription = input.getName() + " " + inputPlugin.getName() + " (Filter)";
+                    String stateIdValue;
+                    if (inputPlugin.getIsActive()) stateIdValue = "active";
+                    else stateIdValue = "inactive";
+
+                    waveLinkPlugin.sendCreateState("WaveLinkInputs", inputFilterStateId,
+                            inputFilterStateDescription, stateIdValue);
+
+
+                });
             }
+
 
 
         }
 
-        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants.WaveLinkInputs.States.InputList.ID, allInputsString);
+
+        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                .WaveLinkInputs.States.InputList.ID, allInputsString);
+
+        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                .WaveLinkInputs.States.FilterList.ID, Status.allFilters.toArray(new String[0]));
 
     }
 
@@ -402,10 +472,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "LocalFilterBypass", input.getPluginBypassLocal());
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "StreamFilterBypass", input.getPluginBypassStream());
 
-
-
-
-            System.out.println("SETTING LOCAL VALUE");
             Status.setInputValue(input.getName(), input.getLocalMixerLevel(), "Local");
             Status.setInputValue(input.getName(), input.getStreamMixerLevel(), "Stream");
         });
@@ -506,6 +572,9 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkInputs")
     private String[] inputList;
+
+    @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkInputs")
+    private String[] filterList;
 
     /**
      * State that has a list of all outputs for monitor mix
@@ -694,6 +763,9 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     private boolean isInput(Input input, String choice) {
         return input.getName().equals(choice);
+    }
+    private boolean isInputPlugin(InputPlugin inputPlugin, String choice) {
+        return inputPlugin.getName().equals(choice);
     }
     private boolean isLocalMixer(String mixerId) {
         return mixerId.equals("Local") || mixerId.equals("Both");
