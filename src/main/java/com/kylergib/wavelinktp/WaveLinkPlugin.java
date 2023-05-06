@@ -310,7 +310,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      *
      * @param value Integer
      * @param choices list of strings
-     * @param mixerId list of strings
      */
 
     @Action(description = "Set filter to be active/inactive for input", format = "Set input: {$choices$} for filter: {$filters$} to {$value$}",
@@ -711,10 +710,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when a List Change Message is received
      */
     public void onListChanged(TPListChangeMessage tpListChangeMessage) {
+        boolean isInputFilter = tpListChangeMessage.actionId.equals(
+                "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.action.actionSetInputFilterActive");
+        boolean isFirstOption = tpListChangeMessage.listId.equals("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList");
 
-
-        if (tpListChangeMessage.actionId.equals(
-                "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.action.actionSetInputFilterActive")) {
+        if (isInputFilter && isFirstOption) {
             String inputName = tpListChangeMessage.value;
             List<String> filterList = new ArrayList<>();
 
