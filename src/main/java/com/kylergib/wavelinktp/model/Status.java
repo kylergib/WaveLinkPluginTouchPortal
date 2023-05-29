@@ -6,8 +6,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Base64;
 /**
  * Current status for things inside of wave link
  */
@@ -117,9 +121,40 @@ public abstract class Status {
         JSONArray resultJson = (JSONArray) inputConfigs.get("result");
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
+
+
             String identifier = (String) tempJson.get("identifier");
             String name = (String) tempJson.get("name");
             Boolean isAvailable = (Boolean) tempJson.get("isAvailable");
+
+            //testing
+            String iconData = (String) tempJson.get("iconData");
+            byte[] decodedIcon = Base64.getDecoder().decode(iconData);
+
+
+            String folderPath = "icons";
+            File folder = new File(folderPath);
+            if (!folder.exists()) {
+                boolean created = folder.mkdirs();
+                if (!created) {
+                    System.out.println("Failed to create the folder.");
+                    return;
+                }
+            }
+
+            // Saving as a file
+            if (!iconData.isEmpty()) {
+                String fileName = folderPath + File.separator + name + "Image.png";
+                try (FileOutputStream fos = new FileOutputStream(fileName)) {
+                    fos.write(decodedIcon);
+                    System.out.println("Image saved successfully as " + fileName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+            //end testing
 
             JSONArray streamMixer = (JSONArray) tempJson.get("streamMixer"); //isMuted, level, unknown
             Boolean streamMixerMuted = (Boolean) streamMixer.get(0);

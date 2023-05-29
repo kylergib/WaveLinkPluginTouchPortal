@@ -42,8 +42,11 @@ public class WaveLinkClient extends WebSocketClient {
     //chooses what to do when client receives messages from wave link
     @Override
     public void onMessage(String message) {
-        System.out.println(message);
+//        System.out.println(message);
         JSONObject newReceive = new JSONObject(message);
+
+
+
         if (newReceive.keySet().contains("id")) {
             //id in message matches what the client sent from WaveLinkPlugin class
             if ((int) newReceive.get("id") == 11) {
@@ -71,6 +74,10 @@ public class WaveLinkClient extends WebSocketClient {
                         new JSONObject(message);
                 Status.getInput();
                 configsReceived = configsReceived + 1;
+
+
+
+
             }
             if (configsReceived == 6) {
                 configCallback.onConfigsReceived();
