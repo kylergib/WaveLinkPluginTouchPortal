@@ -19,13 +19,34 @@ import java.util.logging.Logger;
 
 
 @Plugin(version = BuildConfig.VERSION_CODE, colorDark = "#203060", colorLight = "#4070F0", name = "Wave Link Plugin")
-public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener, WaveLinkCallback {
+public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener,
+        MonitorAppThread.AppOpenCallback, WaveLinkCallback {
     public static CountDownLatch latch = new CountDownLatch(1);
     public static WaveLinkClient client;
     public static WaveLinkPlugin waveLinkPlugin;
     public final static Logger LOGGER = Logger.getLogger(TouchPortalPlugin.class.getName());
     private String currentIp;
     private Boolean firstRun;
+    private static boolean appIsOpen;
+    private MonitorAppThread monitorAppThread;
+
+    @Override
+    public void onAppOpened() {
+        LOGGER.log(Level.INFO, "Wave Link opened");
+        appIsOpen = true;
+        try {
+            connectToWaveLink();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void onAppClosed() {
+        LOGGER.log(Level.WARNING, "Wave Link closed");
+        appIsOpen = false;
+        client.close();
+    }
 
 
     private enum Categories {
@@ -95,7 +116,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
         if (client.isOpen()) {
-            client.setConfigCallback(waveLinkPlugin);
+            client.setConfigCallback(this);
             WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
             SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
             SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
@@ -674,6 +695,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         // Socket connection is lost or plugin has received close message
         client.close();
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Disconnected");
+        monitorAppThread.requestStop();
         System.exit(0);
     }
 
@@ -700,10 +722,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when the Info Message is received when Touch Portal confirms our initial connection is successful
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
-        try {
-            waveLinkPlugin.connectToWaveLink();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        //TODO: add check for update
+        if (monitorAppThread == null) {
+            monitorAppThread = new MonitorAppThread(this);
+            monitorAppThread.start();
         }
 
     }
