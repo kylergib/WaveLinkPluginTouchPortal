@@ -43,13 +43,6 @@ public class InputPlugin {
     public Boolean getIsActive() {
         return this.isActive;
     }
-    public Boolean getActive() {
-        return isActive;
-    }
-
-    public void setActive(Boolean active) {
-        isActive = active;
-    }
 
 
 }

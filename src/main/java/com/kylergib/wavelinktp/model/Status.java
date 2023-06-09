@@ -6,14 +6,19 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Base64;
 /**
  * Current status for things inside of wave link
  */
 
 public abstract class Status {
     //info about app, probably just need this for debugging
+    //TODO: clean up
     public static JSONObject applicationInfo;
     public static String selectedOutput;
     public static String selectedOutputFinished;
@@ -35,6 +40,7 @@ public abstract class Status {
 
     public static ArrayList<Output> allOutputs = new ArrayList<>();
     public static ArrayList<Input> allInputs = new ArrayList<>();
+    public static ArrayList<String> allFilters = new ArrayList<>();
     public static ArrayList<Microphone> allMics = new ArrayList<>();
 
     public static OutputConfig outputStatus;
@@ -50,6 +56,7 @@ public abstract class Status {
     public static final String streamPackageName = "com.elgato.mix.stream";
 
     public static ArrayList<String> sentStates = new ArrayList<>();
+
 
     public static void getSwitchState() {
         // what you are listening to in bottom right hand corner of wave link
@@ -105,20 +112,50 @@ public abstract class Status {
     }
 
     public static void getInput() {
-        //TODO: does not update when an input is removed
         //TODO: possible to get icon data and import icon?
         if (!allInputs.isEmpty()) {
             allInputs.clear();
         }
         int id = (int) inputConfigs.get("id");
+        System.out.println("INPUT CONFIGS" + inputConfigs.toString());
         JSONArray resultJson = (JSONArray) inputConfigs.get("result");
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
+
+
             String identifier = (String) tempJson.get("identifier");
             String name = (String) tempJson.get("name");
             Boolean isAvailable = (Boolean) tempJson.get("isAvailable");
 
-            //LEFTOFF
+            //testing
+            String iconData = (String) tempJson.get("iconData");
+            byte[] decodedIcon = Base64.getDecoder().decode(iconData);
+
+
+            String folderPath = "icons";
+            File folder = new File(folderPath);
+            if (!folder.exists()) {
+                boolean created = folder.mkdirs();
+                if (!created) {
+                    System.out.println("Failed to create the folder.");
+                    return;
+                }
+            }
+
+            // Saving as a file
+            if (!iconData.isEmpty()) {
+                String fileName = folderPath + File.separator + name + "Image.png";
+                try (FileOutputStream fos = new FileOutputStream(fileName)) {
+                    fos.write(decodedIcon);
+                    System.out.println("Image saved successfully as " + fileName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+            //end testing
+
             JSONArray streamMixer = (JSONArray) tempJson.get("streamMixer"); //isMuted, level, unknown
             Boolean streamMixerMuted = (Boolean) streamMixer.get(0);
             int streamMixerLevel = (Integer) streamMixer.get(1);
@@ -144,6 +181,9 @@ public abstract class Status {
                     Boolean isActive = (Boolean) tempPlugin.get("isActive");
                     InputPlugin newPlugin = new InputPlugin(filterId,pluginId,pluginName,isActive);
                     inputPlugins.add(newPlugin);
+                    if (!allFilters.contains(pluginName)) {
+                        allFilters.add(pluginName);
+                    }
                 }
             } catch (JSONException ignored) {
             }

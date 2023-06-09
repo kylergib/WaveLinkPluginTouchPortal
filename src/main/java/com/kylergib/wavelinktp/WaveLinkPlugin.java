@@ -8,7 +8,19 @@ import com.christophecvb.touchportal.helpers.ReceivedMessageHelper;
 import com.christophecvb.touchportal.model.*;
 import com.google.gson.JsonObject;
 import com.kylergib.wavelinktp.model.*;
+import org.json.JSONObject;
 
+import java.awt.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,13 +29,34 @@ import java.util.logging.Logger;
 
 
 @Plugin(version = BuildConfig.VERSION_CODE, colorDark = "#203060", colorLight = "#4070F0", name = "Wave Link Plugin")
-public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener, WaveLinkCallback {
+public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener,
+        MonitorAppThread.AppOpenCallback, WaveLinkCallback {
     public static CountDownLatch latch = new CountDownLatch(1);
     public static WaveLinkClient client;
     public static WaveLinkPlugin waveLinkPlugin;
     public final static Logger LOGGER = Logger.getLogger(TouchPortalPlugin.class.getName());
     private String currentIp;
     private Boolean firstRun;
+    private static boolean appIsOpen;
+    private MonitorAppThread monitorAppThread;
+
+    @Override
+    public void onAppOpened() {
+        LOGGER.log(Level.INFO, "Wave Link opened");
+        appIsOpen = true;
+        try {
+            connectToWaveLink();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void onAppClosed() {
+        LOGGER.log(Level.WARNING, "Wave Link closed");
+        appIsOpen = false;
+        client.close();
+    }
 
 
     private enum Categories {
@@ -64,6 +97,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
     }
+
+
     @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
     private void connectToWaveLink() throws Exception {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
@@ -91,7 +126,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
         if (client.isOpen()) {
-            client.setConfigCallback(waveLinkPlugin);
+            client.setConfigCallback(this);
             WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
             SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
             SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
@@ -304,6 +339,54 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         });
     }
     /**
+     * Action to set input to be muted or not, can be toggled
+     *
+     * @param value Integer
+     * @param choices list of strings
+     */
+
+    @Action(description = "Set filter to be active/inactive for input", format = "Set input: {$choices$} for filter: {$filters$} to {$value$}",
+            categoryId = "WaveLinkInputs", name="Enable/Disable input filter")
+    private void actionSetInputFilterActive(@Data(stateId = "inputList")  String[] choices, @Data(valueChoices = {"true","false","toggle"}) String[] value,
+                                    @Data(stateId = "filterList")  String[] filters) {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputFilter received: " + value[0] + " - " + choices[0] +
+                " - " + filters[0]);
+        Status.allInputs.stream().filter(input -> isInput(input, choices[0])).forEach(input -> {
+
+
+
+                //below will only run if input has the filter
+                input.getPlugins().stream().filter(inputPlugin ->
+                        isInputPlugin(inputPlugin,filters[0]))
+                        .forEach(inputPlugin -> {
+
+                    Boolean newValue;
+                    if (value[0].equals("toggle")) {
+                        newValue = !inputPlugin.getIsActive();
+                    } else {
+                        newValue = Boolean.valueOf(value[0]);
+                    }
+                    System.out.println(String.format("%s", inputPlugin.getName(), inputPlugin.getIsActive()));
+                    System.out.println(String.format("%s", input.getName()));
+
+                    String stateId = input.getName().replace(" ","") + "Filter" + inputPlugin.getName();
+                    String stateIdValue;
+                    if (newValue) stateIdValue = "active";
+                    else stateIdValue = "inactive";
+
+
+
+
+                    inputPlugin.setIsActive(newValue);
+                    WaveLinkActions.setInputFilter(input.getIdentifier(),inputPlugin.getFilterID(),newValue);
+                            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + stateId,stateIdValue);
+                    System.out.println(stateId + " - " + stateIdValue);
+
+                });
+
+        });
+    }
+    /**
      * Action to set input volume to a specific integer
      *
      * @param integerValue Integer
@@ -320,10 +403,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (isLocalMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume",integerValue);
                 input.setLocalMixerLevel(integerValue);
+                Status.setInputValue(input.getName(),integerValue,"Local");
             }
             if (isStreamMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", integerValue);
                 input.setStreamMixerLevel(integerValue);
+                Status.setInputValue(input.getName(),integerValue,"Stream");
             }
         });
     }
@@ -371,12 +456,30 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
                 Status.sentStates.add(input.getName().replace(" ",""));
                 System.out.println("Sent state: " + input.getName().replace(" ",""));
+
+                //TODO: adding states for each input
+                //NEW
+                input.getPlugins().forEach(inputPlugin -> {
+                    String inputFilterStateId = input.getName().replace(" ", "") + "Filter" + inputPlugin.getName();
+                    String inputFilterStateDescription = input.getName() + " " + inputPlugin.getName() + " (Filter)";
+                    String stateIdValue;
+                    if (inputPlugin.getIsActive()) stateIdValue = "active";
+                    else stateIdValue = "inactive";
+
+                    waveLinkPlugin.sendCreateState("WaveLinkInputs", inputFilterStateId,
+                            inputFilterStateDescription, stateIdValue);
+
+
+                });
             }
+
 
 
         }
 
-        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants.WaveLinkInputs.States.InputList.ID, allInputsString);
+
+        waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                .WaveLinkInputs.States.InputList.ID, allInputsString);
 
     }
 
@@ -400,10 +503,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "LocalFilterBypass", input.getPluginBypassLocal());
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "StreamFilterBypass", input.getPluginBypassStream());
 
-
-
-
-            System.out.println("SETTING LOCAL VALUE");
             Status.setInputValue(input.getName(), input.getLocalMixerLevel(), "Local");
             Status.setInputValue(input.getName(), input.getStreamMixerLevel(), "Stream");
         });
@@ -505,6 +604,9 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkInputs")
     private String[] inputList;
 
+    @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkInputs")
+    private String[] filterList;
+
     /**
      * State that has a list of all outputs for monitor mix
      */
@@ -603,6 +705,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         // Socket connection is lost or plugin has received close message
         client.close();
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Disconnected");
+        monitorAppThread.requestStop();
         System.exit(0);
     }
 
@@ -629,10 +732,21 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when the Info Message is received when Touch Portal confirms our initial connection is successful
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
-        try {
-            waveLinkPlugin.connectToWaveLink();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        boolean updateAvailable = checkForUpdate();
+        if (updateAvailable) {
+            waveLinkPlugin.sendShowNotification(
+                    WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification",
+                    "Update is available. ",
+                    "You are on version: " + BuildConfig.VERSION_CODE + " and an update is available on GitHub",
+                    new TPNotificationOption[]{
+                            new TPNotificationOption(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification.options.openLink", "Open Link")
+                    });
+
+
+        }
+        if (monitorAppThread == null) {
+            monitorAppThread = new MonitorAppThread(this);
+            monitorAppThread.start();
         }
 
     }
@@ -640,7 +754,28 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     /**
      * Called when a List Change Message is received
      */
-    public void onListChanged(TPListChangeMessage tpListChangeMessage) { }
+    public void onListChanged(TPListChangeMessage tpListChangeMessage) {
+        boolean isInputFilter = tpListChangeMessage.actionId.equals(
+                "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.action.actionSetInputFilterActive");
+        boolean isFirstOption = tpListChangeMessage.listId.equals("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList");
+
+        if (isInputFilter && isFirstOption) {
+            String inputName = tpListChangeMessage.value;
+            List<String> filterList = new ArrayList<>();
+
+            Status.allInputs.stream().filter(input -> isInput(input,inputName)).forEach(input -> {
+                input.getPlugins().forEach(inputPlugin -> {
+                    filterList.add(inputPlugin.getName());
+                });
+            });
+
+            waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                    .WaveLinkInputs.States.FilterList.ID, filterList.toArray(new String[0]), true);
+//            }
+        }
+
+
+    }
 
     /**
      * Called when a Broadcast Message is received
@@ -673,7 +808,37 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     @Override
     public void onNotificationOptionClicked(TPNotificationOptionClickedMessage tpNotificationOptionClickedMessage) {
+        if (tpNotificationOptionClickedMessage.notificationId.equals(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification")) {
+            if (tpNotificationOptionClickedMessage.optionId.equals(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification.options.openLink")) {
 
+                LOGGER.log(Level.INFO, "Update option clicked");
+                //TODO: redirect to github
+                String url = "https://github.com/kylergib/WaveLinkPluginTouchPortal";
+
+                // Create a URI object from the URL
+                URI uri = null;
+                try {
+                    uri = new URI(url);
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+                // Check if the Desktop API is supported on the current platform
+                if (Desktop.isDesktopSupported()) {
+                    // Get the desktop instance
+                    Desktop desktop = Desktop.getDesktop();
+
+                    // Check if the desktop can browse the URI
+                    if (desktop.isSupported(Desktop.Action.BROWSE)) {
+                        // Open the URL in the default browser
+                        try {
+                            desktop.browse(uri);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -693,11 +858,60 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     private boolean isInput(Input input, String choice) {
         return input.getName().equals(choice);
     }
+    private boolean isInputPlugin(InputPlugin inputPlugin, String choice) {
+        return inputPlugin.getName().equals(choice);
+    }
     private boolean isLocalMixer(String mixerId) {
         return mixerId.equals("Local") || mixerId.equals("Both");
     }
     private boolean isStreamMixer(String mixerId) {
         return mixerId.equals("Stream") || mixerId.equals("Both");
+    }
+
+    public boolean checkForUpdate() {
+        //TODO: replace with right info after commit
+        String repositoryOwner = "kylergib";
+        String repositoryName = "WaveLinkPluginTouchPortal";
+
+        try {
+            URL url = new URL("https://api.github.com/repos/" + repositoryOwner + "/" + repositoryName + "/releases/latest");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+
+            if (conn.getResponseCode() != 200) {
+                LOGGER.log(Level.INFO, "Failed : HTTP Error code : " + conn.getResponseCode());
+                return false;
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+            String output;
+            StringBuilder response = new StringBuilder();
+
+            while ((output = br.readLine()) != null) {
+                response.append(output);
+            }
+
+            conn.disconnect();
+            JSONObject responseJSON = new JSONObject(response.toString());
+
+            List<String> version = Arrays.asList(responseJSON.getString("tag_name").split("\\."));
+            int newestVersion = 0;
+            if (version.size() == 3) {
+                newestVersion = (Integer.valueOf(version.get(0)) * 1000) +
+                        (Integer.valueOf(version.get(1)) * 100) +
+                        (Integer.valueOf(version.get(2)));
+            }
+            int currentVersion = Integer.valueOf(String.valueOf(BuildConfig.VERSION_CODE));
+
+            LOGGER.log(Level.INFO, "Newest version available is: " + newestVersion);
+            LOGGER.log(Level.INFO, "Current version is: " + currentVersion);
+            return currentVersion < newestVersion;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
 

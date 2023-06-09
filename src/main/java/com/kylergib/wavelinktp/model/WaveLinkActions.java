@@ -70,6 +70,15 @@ public abstract class WaveLinkActions {
         actionSend(params,"setInputConfig",17);
     }
 
+    public static void setInputFilter(String inputIdentifier,
+                                      String filterId, Object value) {
+        JSONObject params = new JSONObject();
+        params.put("identifier",inputIdentifier);
+        params.put("filterID",filterId);
+        params.put("value", value);
+        actionSend(params,"setFilter",18);
+    }
+
     public static void setMonitorMixOutput(String name) {
         String inputIdentifier = null;
         for (Output output: Status.allOutputs) {
