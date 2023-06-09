@@ -19,18 +19,17 @@ jobs:
         with:
           java-version: '8'
           distribution: 'temurin'
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-      - name: Build with Gradle
-        run: ./gradlew
-      - name: Package plugin
-        run: ./gradlew packagePlugin
+      - name: Build and package
+        run: |
+          chmod +x gradlew
+          ./gradlew
+          ./gradlew packagePlugin
       - name: Get version
         id: get_version
         run: echo ::set-output name=VERSION::$(./gradlew -q printVersion)
       - name: Copy file to release
         run: |
-          mkdir -p $RELEASE_DIR
+          mkdir -p ${{ github.workspace }}/release
           cp examplePages/Wave-Link-Example.tpz ${{ github.workspace }}/release
           cp examplePages/Wave-Link-Output-Monitor.tpz ${{ github.workspace }}/release
       - name: Create Release
