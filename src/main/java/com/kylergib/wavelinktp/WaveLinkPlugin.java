@@ -8,8 +8,18 @@ import com.christophecvb.touchportal.helpers.ReceivedMessageHelper;
 import com.christophecvb.touchportal.model.*;
 import com.google.gson.JsonObject;
 import com.kylergib.wavelinktp.model.*;
+import org.json.JSONObject;
 
+import java.awt.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
@@ -722,7 +732,18 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when the Info Message is received when Touch Portal confirms our initial connection is successful
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
-        //TODO: add check for update
+        boolean updateAvailable = checkForUpdate();
+        if (updateAvailable) {
+            waveLinkPlugin.sendShowNotification(
+                    WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification",
+                    "Update is available. ",
+                    "You are on version: " + BuildConfig.VERSION_CODE + " and an update is available on GitHub",
+                    new TPNotificationOption[]{
+                            new TPNotificationOption(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification.options.openLink", "Open Link")
+                    });
+
+
+        }
         if (monitorAppThread == null) {
             monitorAppThread = new MonitorAppThread(this);
             monitorAppThread.start();
@@ -787,7 +808,37 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     @Override
     public void onNotificationOptionClicked(TPNotificationOptionClickedMessage tpNotificationOptionClickedMessage) {
+        if (tpNotificationOptionClickedMessage.notificationId.equals(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification")) {
+            if (tpNotificationOptionClickedMessage.optionId.equals(WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification.options.openLink")) {
 
+                LOGGER.log(Level.INFO, "Update option clicked");
+                //TODO: redirect to github
+                String url = "https://github.com/kylergib/WaveLinkPluginTouchPortal";
+
+                // Create a URI object from the URL
+                URI uri = null;
+                try {
+                    uri = new URI(url);
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+                // Check if the Desktop API is supported on the current platform
+                if (Desktop.isDesktopSupported()) {
+                    // Get the desktop instance
+                    Desktop desktop = Desktop.getDesktop();
+
+                    // Check if the desktop can browse the URI
+                    if (desktop.isSupported(Desktop.Action.BROWSE)) {
+                        // Open the URL in the default browser
+                        try {
+                            desktop.browse(uri);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -815,6 +866,52 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
     private boolean isStreamMixer(String mixerId) {
         return mixerId.equals("Stream") || mixerId.equals("Both");
+    }
+
+    public boolean checkForUpdate() {
+        //TODO: replace with right info after commit
+        String repositoryOwner = "kylergib";
+        String repositoryName = "WaveLinkPluginTouchPortal";
+
+        try {
+            URL url = new URL("https://api.github.com/repos/" + repositoryOwner + "/" + repositoryName + "/releases/latest");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+
+            if (conn.getResponseCode() != 200) {
+                LOGGER.log(Level.INFO, "Failed : HTTP Error code : " + conn.getResponseCode());
+                return false;
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+            String output;
+            StringBuilder response = new StringBuilder();
+
+            while ((output = br.readLine()) != null) {
+                response.append(output);
+            }
+
+            conn.disconnect();
+            JSONObject responseJSON = new JSONObject(response.toString());
+
+            List<String> version = Arrays.asList(responseJSON.getString("tag_name").split("\\."));
+            int newestVersion = 0;
+            if (version.size() == 3) {
+                newestVersion = (Integer.valueOf(version.get(0)) * 1000) +
+                        (Integer.valueOf(version.get(1)) * 100) +
+                        (Integer.valueOf(version.get(2)));
+            }
+            int currentVersion = Integer.valueOf(String.valueOf(BuildConfig.VERSION_CODE));
+
+            LOGGER.log(Level.INFO, "Newest version available is: " + newestVersion);
+            LOGGER.log(Level.INFO, "Current version is: " + currentVersion);
+            return currentVersion < newestVersion;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
 
