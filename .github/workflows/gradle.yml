@@ -1,6 +1,5 @@
 name: Gradle Build
 
-
 on:
   push:
     branches: [ "main" ]
@@ -29,6 +28,14 @@ jobs:
       - name: Get version
         id: get_version
         run: echo ::set-output name=VERSION::$(./gradlew -q printVersion)
+      - name: Copy file to release
+        run: |
+          mkdir -p ${{ env.RELEASE_DIR }}
+          cp examplePages/Wave-Link-Example.tpz ${{ env.RELEASE_DIR }}
+      - name: Copy file to release
+        run: |
+          mkdir -p ${{ env.RELEASE_DIR }}
+          cp examplePages/Wave-Link-Output-Monitor.tpz ${{ env.RELEASE_DIR }}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -55,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.RELEASE_DIR }}/examplePages/Wave-Link-Example.tpz
+          asset_path: ${{ env.RELEASE_DIR }}/Wave-Link-Example.tpz
           asset_name: Wave-Link-Example.tpz
           asset_content_type: application/octet-stream
       - name: Upload file to release
@@ -64,7 +71,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.RELEASE_DIR }}/examplePages/Wave-Link-Output-Monitor.tpz
+          asset_path: ${{ env.RELEASE_DIR }}/Wave-Link-Output-Monitor.tpz
           asset_name: Wave-Link-Output-Monitor.tpz
           asset_content_type: application/octet-stream
 
