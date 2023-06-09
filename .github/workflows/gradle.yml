@@ -48,4 +48,22 @@ jobs:
           asset_path: ./build/plugin/WaveLinkPlugin.tpp
           asset_name: WaveLinkPlugin.tpp
           asset_content_type: application/octet-stream
+      - name: Upload file to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.RELEASE_DIR }}/examplePages/Wave-Link-Example.tpz
+          asset_name: Wave-Link-Example.tpz
+          asset_content_type: application/octet-stream
+      - name: Upload file to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.RELEASE_DIR }}/examplePages/Wave-Link-Output-Monitor.tpz
+          asset_name: Wave-Link-Output-Monitor.tpz
+          asset_content_type: application/octet-stream
 
