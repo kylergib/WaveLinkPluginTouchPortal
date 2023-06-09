@@ -747,9 +747,15 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         }
-        if (monitorAppThread == null) {
+        if (monitorAppThread == null && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
             monitorAppThread = new MonitorAppThread(this);
             monitorAppThread.start();
+        } else {
+            try {
+                connectToWaveLink();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
     }
