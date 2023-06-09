@@ -66,6 +66,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
     }
+
+
     @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
     private void connectToWaveLink() throws Exception {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
