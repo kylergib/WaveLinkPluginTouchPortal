@@ -31,10 +31,8 @@ jobs:
       - name: Copy file to release
         run: |
           mkdir -p $RELEASE_DIR
-          cp examplePages/Wave-Link-Example.tpz $RELEASE_DIR
-          cp examplePages/Wave-Link-Output-Monitor.tpz $RELEASE_DIR
-        env:
-          RELEASE_DIR: ${{ github.workspace }}/release
+          cp examplePages/Wave-Link-Example.tpz ${{ github.workspace }}/release
+          cp examplePages/Wave-Link-Output-Monitor.tpz ${{ github.workspace }}/release
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -60,7 +58,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.RELEASE_DIR }}/Wave-Link-Example.tpz
+          asset_path: ${{ github.workspace }}/release/Wave-Link-Example.tpz
           asset_name: Wave-Link-Example.tpz
           asset_content_type: application/octet-stream
       - name: Upload file to release
@@ -69,7 +67,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.RELEASE_DIR }}/Wave-Link-Output-Monitor.tpz
+          asset_path: ${{ github.workspace }}/release/Wave-Link-Output-Monitor.tpz
           asset_name: Wave-Link-Output-Monitor.tpz
           asset_content_type: application/octet-stream
 
