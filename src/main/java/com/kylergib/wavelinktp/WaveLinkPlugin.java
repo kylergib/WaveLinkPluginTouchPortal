@@ -797,9 +797,15 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
         if (!currentIp.equals(ipSetting)) {
-            if ((!ipSetting.equals("localhost") || !ipSetting.equals("127.0.0.1")) && monitorAppThread != null && monitorAppThread.isAlive()) {
+            boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
+            boolean isLocalhost = (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"));
+
+            if (monitorActive && !isLocalhost) {
                 monitorAppThread.requestStop();
                 LOGGER.log(Level.INFO, "requested monitor to stop");
+            } else if (isLocalhost && !monitorActive) {
+                monitorAppThread = new MonitorAppThread(this);
+                monitorAppThread.start();
             }
             if (client.isOpen()) {
                 client.close();
