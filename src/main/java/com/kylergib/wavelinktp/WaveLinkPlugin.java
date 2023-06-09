@@ -45,6 +45,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         LOGGER.log(Level.INFO, "Wave Link opened");
         appIsOpen = true;
         try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        try {
             connectToWaveLink();
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -55,7 +60,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onAppClosed() {
         LOGGER.log(Level.WARNING, "Wave Link closed");
         appIsOpen = false;
-        client.close();
+        if (client.isOpen()) client.close();
     }
 
 
@@ -110,16 +115,16 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         client = new WaveLinkClient(ipSetting, port);
         while (true) {
             latch.await();
-            System.out.println("tHIS IS PORT " + port);
-            Thread.sleep(150); //need to sleep, or it will try to connect to the next port too quickly
+            Thread.sleep(500); //need to sleep, or it will try to connect to the next port too quickly
             if (!client.isOpen()) {
 
                 if (port < 1829) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
-                    port = port + 1;
+
                     client = new WaveLinkClient(ipSetting, port);
+                    port = port + 1;
                     latch = new CountDownLatch(1);
                 } else {
-                    break;
+                    port = 1824;
                 }
             } else {
                 break;
@@ -201,9 +206,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     private void selectMonitorMixOutput(@Data(stateId = "outputList") String[] choices) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetOutputMute received: " + choices[0]);
         Status.selectMonitorMixOutputRunning = true;
-        System.out.println("Start ACTION MONITOR");
         LOGGER.log(Level.INFO, "Action with Outputs received: " + choices[0]);
-        System.out.println(Status.selectedOutput + " - " + choices[0]);
         if (!Status.selectedOutput.equals(choices[0])) {
             Status.selectedOutput = choices[0];
             WaveLinkActions.setMonitorMixOutput(choices[0]);
@@ -744,9 +747,15 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         }
-        if (monitorAppThread == null) {
+        if (monitorAppThread == null && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
             monitorAppThread = new MonitorAppThread(this);
             monitorAppThread.start();
+        } else {
+            try {
+                connectToWaveLink();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
 
     }
@@ -788,6 +797,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
         if (!currentIp.equals(ipSetting)) {
+            if ((!ipSetting.equals("localhost") || !ipSetting.equals("127.0.0.1")) && monitorAppThread != null && monitorAppThread.isAlive()) {
+                monitorAppThread.requestStop();
+                LOGGER.log(Level.INFO, "requested monitor to stop");
+            }
             if (client.isOpen()) {
                 client.close();
                 WaveLinkPlugin.LOGGER.log(Level.INFO, "Closed previous connection to Wave Link");
@@ -798,7 +811,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 }
             }
             try {
-                System.out.println("TRYING TO RECONNECT TO WL - " + currentIp + " - " + ipSetting);
                 waveLinkPlugin.connectToWaveLink();
             } catch (Exception e) {
                 throw new RuntimeException(e);
