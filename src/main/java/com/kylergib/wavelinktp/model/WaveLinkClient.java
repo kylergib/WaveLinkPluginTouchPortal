@@ -42,7 +42,6 @@ public class WaveLinkClient extends WebSocketClient {
     //chooses what to do when client receives messages from wave link
     @Override
     public void onMessage(String message) {
-//        System.out.println(message);
         JSONObject newReceive = new JSONObject(message);
 
 
@@ -134,7 +133,6 @@ public class WaveLinkClient extends WebSocketClient {
             } else if (method.equals("outputSwitched")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
                 Status.switchStateValue = (String) params.get("value");
-                System.out.println(params);
                 String monitorValue = null;
                 if (Status.switchStateValue.equals(Status.streamPackageName)) {
                     monitorValue = "Stream";
@@ -321,6 +319,7 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onError(Exception ex) {
         WaveLinkPlugin.LOGGER.log(Level.SEVERE, ex.toString());
+        ex.printStackTrace();
 
     }
 

@@ -70,7 +70,6 @@ public abstract class Status {
             monitorValue = "Local";
         }
         WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.MonitoredMix.ID, monitorValue);
-        System.out.println("THIS IS SWITCH STATE NEW " + switchStateValue + " - " + monitorValue);
 
     }
 
@@ -117,7 +116,6 @@ public abstract class Status {
             allInputs.clear();
         }
         int id = (int) inputConfigs.get("id");
-        System.out.println("INPUT CONFIGS" + inputConfigs.toString());
         JSONArray resultJson = (JSONArray) inputConfigs.get("result");
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
@@ -147,7 +145,6 @@ public abstract class Status {
                 String fileName = folderPath + File.separator + name + "Image.png";
                 try (FileOutputStream fos = new FileOutputStream(fileName)) {
                     fos.write(decodedIcon);
-                    System.out.println("Image saved successfully as " + fileName);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
