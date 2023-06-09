@@ -47,12 +47,21 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         try {
             Thread.sleep(500);
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            LOGGER.log(Level.WARNING, e.toString());
         }
         try {
-            connectToWaveLink();
+            if (currentIp.equals("localhost") || currentIp.equals("127.0.0.1")) {
+                connectToWaveLink();
+                int retry = 0;
+                while (!client.isOpen()) {
+
+                    connectToWaveLink();
+                    if (retry > 3) break;
+                    retry += 1;
+                }
+            }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            LOGGER.log(Level.WARNING, e.toString());
         }
     }
 
@@ -110,12 +119,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         //start port at 1824, if wave link is not on 1824 it will connect to the next point and then stop at 1835.
         firstRun = true;
         int port = 1824;
-        //checks if client is already initialized and open and closes so that it can attempt to reconnect.
-        currentIp = ipSetting;
+
         client = new WaveLinkClient(ipSetting, port);
         while (true) {
             latch.await();
-            Thread.sleep(500); //need to sleep, or it will try to connect to the next port too quickly
+            Thread.sleep(100); //need to sleep, or it will try to connect to the next port too quickly
             if (!client.isOpen()) {
 
                 if (port < 1829) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
@@ -124,7 +132,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     port = port + 1;
                     latch = new CountDownLatch(1);
                 } else {
-                    port = 1824;
+                    break;
                 }
             } else {
                 break;
@@ -524,7 +532,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                LOGGER.log(Level.WARNING, e.toString());
             }
         }
 
@@ -735,6 +743,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Called when the Info Message is received when Touch Portal confirms our initial connection is successful
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
+        currentIp = ipSetting;
         boolean updateAvailable = checkForUpdate();
         if (updateAvailable) {
             waveLinkPlugin.sendShowNotification(
@@ -754,7 +763,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             try {
                 connectToWaveLink();
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                LOGGER.log(Level.WARNING, e.toString());
             }
         }
 
@@ -796,24 +805,45 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
+        WaveLinkPlugin.LOGGER.log(Level.INFO, currentIp);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, ipSetting);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, String.valueOf(currentIp.equals(ipSetting)));
         if (!currentIp.equals(ipSetting)) {
-            if ((!ipSetting.equals("localhost") || !ipSetting.equals("127.0.0.1")) && monitorAppThread != null && monitorAppThread.isAlive()) {
-                monitorAppThread.requestStop();
-                LOGGER.log(Level.INFO, "requested monitor to stop");
-            }
+            currentIp = ipSetting;
+            boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
+            boolean isLocalhost = (currentIp.equals("localhost") || currentIp.equals("127.0.0.1"));
+
             if (client.isOpen()) {
                 client.close();
                 WaveLinkPlugin.LOGGER.log(Level.INFO, "Closed previous connection to Wave Link");
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
+                    LOGGER.log(Level.WARNING, e.toString());
                 }
             }
+
+            if (monitorActive && !isLocalhost) {
+                monitorAppThread.requestStop();
+                LOGGER.log(Level.INFO, "requested monitor to stop");
+            } else if (isLocalhost && !monitorActive) {
+                monitorAppThread = new MonitorAppThread(this);
+                monitorAppThread.start();
+                LOGGER.log(Level.INFO, "requested monitor to start");
+                return;
+
+            }
+
             try {
-                waveLinkPlugin.connectToWaveLink();
+                int retry = 0;
+                while (!client.isOpen()) {
+
+                    connectToWaveLink();
+                    if (retry > 3) break;
+                    retry += 1;
+                }
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                LOGGER.log(Level.WARNING, e.toString());
             }
         }
     }
@@ -832,7 +862,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 try {
                     uri = new URI(url);
                 } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
+                    LOGGER.log(Level.WARNING, e.toString());
                 }
                 // Check if the Desktop API is supported on the current platform
                 if (Desktop.isDesktopSupported()) {
@@ -845,7 +875,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                         try {
                             desktop.browse(uri);
                         } catch (IOException e) {
-                            throw new RuntimeException(e);
+                            LOGGER.log(Level.WARNING, e.toString());
                         }
                     }
                 }
@@ -862,7 +892,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         try {
             waveLinkPlugin.actionUpdatePuts();
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            LOGGER.log(Level.WARNING, e.toString());
         }
         firstRun = false;
     }
