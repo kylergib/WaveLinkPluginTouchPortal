@@ -30,12 +30,11 @@ jobs:
         run: echo ::set-output name=VERSION::$(./gradlew -q printVersion)
       - name: Copy file to release
         run: |
-          mkdir -p ${{ env.RELEASE_DIR }}
-          cp examplePages/Wave-Link-Example.tpz ${{ env.RELEASE_DIR }}
-      - name: Copy file to release
-        run: |
-          mkdir -p ${{ env.RELEASE_DIR }}
-          cp examplePages/Wave-Link-Output-Monitor.tpz ${{ env.RELEASE_DIR }}
+          mkdir -p $RELEASE_DIR
+          cp examplePages/Wave-Link-Example.tpz $RELEASE_DIR
+          cp examplePages/Wave-Link-Output-Monitor.tpz $RELEASE_DIR
+        env:
+          RELEASE_DIR: ${{ github.workspace }}/release
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
