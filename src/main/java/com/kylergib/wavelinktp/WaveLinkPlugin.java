@@ -570,26 +570,26 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
     //Mic actions
-    @Action(description = "Change mic gain, choose if you want to set it or increase/decrease it", format = "Mic: {$choices$} - {$options$} Gain: {$value$}",
+    @Action(description = "Change mic gain, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Gain: {$value$}",
             categoryId = "WaveLinkMics", name="Change Mic Gain")
-    private void actionSetMicrophoneGain(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 100) Integer value,
-                                         @Data(valueChoices = {"Set","Increase","Decrease"}) String[] options) {
+    private void actionSetMicrophoneGain(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+                                         @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophone received: " + " - " + choices[0] + " - " + value + " - " + options[0]);
         WaveLinkActions.setMicOutputEnhancement("gain",choices[0],options[0],value);
     }
 
-    @Action(description = "Change mic output volume, choose if you want to set it or increase/decrease it", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
+    @Action(description = "Change mic output volume, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
             categoryId = "WaveLinkMics", name="Change Mic Output Volume")
-    private void actionSetMicrophoneOutputVolume(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 100) Integer value,
-                                                 @Data(valueChoices = {"Set","Increase","Decrease"}) String[] options) {
+    private void actionSetMicrophoneOutputVolume(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+                                                 @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneOutputVolume received: " + choices[0] + " - " + value + " - " + options[0]);
         WaveLinkActions.setMicOutputEnhancement("outputVolume",choices[0],options[0],value);
     }
 
-    @Action(description = "Change mic PC/Mic mix volume, choose if you want to set it or increase/decrease it\n(0 is is closer to mic and 100 is closer to PC)", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
+    @Action(description = "Change mic PC/Mic mix volume, choose if you want to set it\n(0 is is closer to mic and 100 is closer to PC)", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
             categoryId = "WaveLinkMics", name="Change Mic PC/Mic Mix Volume")
-    private void actionSetMicPcMix(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 100) Integer value,
-                                   @Data(valueChoices = {"Set","Increase","Decrease"}) String[] options) {
+    private void actionSetMicPcMix(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+                                   @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicPcMix received: " + choices[0] + " - " + value + " - " + options[0]);
         WaveLinkActions.setMicOutputEnhancement("balance",choices[0],options[0],value);
     }
@@ -598,7 +598,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             categoryId = "WaveLinkMics", name="Toggle Clip Guard")
     private void actionSetMicrophoneClipGuard(@Data(stateId = "micList") String[] choices) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneClipGuard received: " + choices[0]);
-        WaveLinkActions.setMicOutputEnhancement("clipGuard",choices[0],"Set",0);
+        WaveLinkActions.setMicOutputEnhancement("Microphone ClipGuard",choices[0],"Set",0);
 
     }
 
@@ -606,7 +606,15 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             categoryId = "WaveLinkMics", name="Toggle Low Cut Filter")
     private void actionSetMicrophoneLowCut(@Data(stateId = "micList") String[] choices) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneLowCut received: " + choices[0]);
-        WaveLinkActions.setMicOutputEnhancement("lowCut",choices[0],"Set",0);
+        WaveLinkActions.setMicOutputEnhancement("Microphone LowCut",choices[0],"Set",0);
+
+    }
+
+    @Action(format = "Toggle Mute for Mic: {$choices$}",
+            categoryId = "WaveLinkMics", name="Toggle Mute")
+    private void actionSetMicrophoneMute(@Data(stateId = "micList") String[] choices) {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneMute received: " + choices[0]);
+        WaveLinkActions.setMicOutputEnhancement("Microphone Mute",choices[0],"Set",0);
     }
 
     /**
@@ -618,11 +626,14 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkInputs")
     private String[] filterList;
 
+
     /**
      * State that has a list of all outputs for monitor mix
      */
     @State(valueChoices = {}, defaultValue = "", categoryId = "WaveLinkOutputs")
     private String[] outputList;
+
+
 
     @State(defaultValue = "none", categoryId = "WaveLinkOutputs")
     private String selectedOutput;
@@ -683,28 +694,28 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     /**
      * Connector for mic gain volume
      */
-    @Connector(format = "Mic Gain Volume - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Gain Volume",id="gainVolumeConnector")
-    private void micGainVolume(@ConnectorValue Integer gainValue, @Data(stateId = "micList") String[] choices) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector micGainConnector received: " + choices[0] + " - " + gainValue);
-        WaveLinkActions.setMicOutputEnhancement("gain",choices[0],"Set",gainValue);
-    }
+//    @Connector(format = "Mic Gain Volume - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Gain Volume",id="gainVolumeConnector")
+//    private void micGainVolume(@ConnectorValue Integer gainValue, @Data(stateId = "micList") String[] choices) {
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector micGainConnector received: " + choices[0] + " - " + gainValue);
+//        WaveLinkActions.setMicOutputEnhancement("gain",choices[0],"Set",gainValue);
+//    }
     /**
      * Connector for mic output volume (headphone javck on mic)
      */
-    @Connector(format = "Mic Output Volume (Headphone jack on El Gato Mic) - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Mic Output Volume",id="micOutputVolumeConnector")
-    private void micOutputVolume(@ConnectorValue Integer micOutputValue, @Data(stateId = "micList") String[] choices) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector micOutputVolumeConnector received: " + choices[0] + " - " + micOutputValue);
-        WaveLinkActions.setMicOutputEnhancement("outputVolume",choices[0],"Set",micOutputValue);
-    }
+//    @Connector(format = "Mic Output Volume (Headphone jack on El Gato Mic) - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Mic Output Volume",id="micOutputVolumeConnector")
+//    private void micOutputVolume(@ConnectorValue Integer micOutputValue, @Data(stateId = "micList") String[] choices) {
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector micOutputVolumeConnector received: " + choices[0] + " - " + micOutputValue);
+//        WaveLinkActions.setMicOutputEnhancement("outputVolume",choices[0],"Set",micOutputValue);
+//    }
     /**
      * Connector for pc/mic mix volume
      */
-    @Connector(format = "Mic/PC Mix Volume (0-Mic and 100-PC) - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Mic/PC Mix Volume",id="micPcVolumeConnector")
-    private void pcMicMixVolume(@ConnectorValue Integer pcMicValue, @Data(stateId = "micList") String[] choices) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, " - Connector pcMicMixVolumeConnector received: " + choices[0] + " - " + pcMicValue);
-        WaveLinkActions.setMicOutputEnhancement("balance",choices[0],"Set",pcMicValue);
-
-    }
+//    @Connector(format = "Mic/PC Mix Volume (0-Mic and 100-PC) - Mic: {$choices$}", categoryId = "WaveLinkMics", name="Mic/PC Mix Volume",id="micPcVolumeConnector")
+//    private void pcMicMixVolume(@ConnectorValue Integer pcMicValue, @Data(stateId = "micList") String[] choices) {
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, " - Connector pcMicMixVolumeConnector received: " + choices[0] + " - " + pcMicValue);
+//        WaveLinkActions.setMicOutputEnhancement("balance",choices[0],"Set",pcMicValue);
+//
+//    }
 
 
 

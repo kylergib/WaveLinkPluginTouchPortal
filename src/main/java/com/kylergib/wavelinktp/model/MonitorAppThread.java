@@ -71,7 +71,7 @@ public class MonitorAppThread extends Thread {
                 appCallback.onAppOpened();
             }
             try {
-                sleep(500);
+                sleep(1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

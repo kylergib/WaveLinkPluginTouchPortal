@@ -9,8 +9,8 @@ def mainClassSimpleName = 'WaveLinkPlugin'
 def mainClassPackage = 'com.kylergib.wavelinktp'
 group mainClassPackage
 def versionMajor = 1
-def versionMinor = 0
-def versionPatch = 10
+def versionMinor = 1
+def versionPatch = 0
 version versionMajor + '.' + versionMinor + '.' + versionPatch
 def versionCode = versionMajor * 1000 + versionMinor * 100 + versionPatch
 
