@@ -84,7 +84,7 @@ public class MonitorAppThread extends Thread {
     public boolean isAppRunningMac() {
 
         try {
-            Process process = Runtime.getRuntime().exec("pgrep -l WaveLink.exe");
+            Process process = Runtime.getRuntime().exec("pgrep -l WaveLink");
 
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -114,9 +114,12 @@ public class MonitorAppThread extends Thread {
 
     private boolean isAppRunningWin() {
         try {
-            Process process = Runtime.getRuntime().exec("tasklist");
+            ProcessBuilder processBuilder = new ProcessBuilder("tasklist");
+            Process process = processBuilder.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
             String line;
+
             while ((line = reader.readLine()) != null) {
                 if (firstCheck == 0 ) {
                     LOGGER.log(Level.FINEST, line);
@@ -128,6 +131,25 @@ public class MonitorAppThread extends Thread {
                     return true;
                 }
             }
+
+
+
+
+
+//            Process process = Runtime.getRuntime().exec("tasklist");
+//            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+//            String line;
+//            while ((line = reader.readLine()) != null) {
+//                if (firstCheck == 0 ) {
+//                    LOGGER.log(Level.FINEST, line);
+//
+//                }
+//                if (line.contains("WaveLink.exe")) {
+//                    process.destroy();
+//                    firstCheck = 1;
+//                    return true;
+//                }
+//            }
             reader.close();
             process.destroy();
         } catch (IOException e) {
