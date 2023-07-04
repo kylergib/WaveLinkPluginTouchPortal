@@ -1,6 +1,8 @@
 package com.kylergib.wavelinktp.model;
 
 
+import com.kylergib.wavelinktp.WaveLinkPlugin;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -12,6 +14,7 @@ public class MonitorAppThread extends Thread {
     private final AppOpenCallback appCallback;
     private volatile boolean stopRequested = false;
     private final String os;
+    private int firstCheck = 0;
 
     public void requestStop() {
         stopRequested = true;
@@ -71,14 +74,14 @@ public class MonitorAppThread extends Thread {
                 appCallback.onAppOpened();
             }
             try {
-                sleep(500);
+                sleep(1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
             retries += 1;
         }
     }
-    public static boolean isAppRunningMac() {
+    public boolean isAppRunningMac() {
 
         try {
             Process process = Runtime.getRuntime().exec("pgrep -l WaveLink");
@@ -88,37 +91,71 @@ public class MonitorAppThread extends Thread {
             String line;
 
             while ((line = reader.readLine()) != null) {
+                if (firstCheck == 0 ) {
+                    LOGGER.log(Level.FINEST, line);
+
+                }
                 if (line.toLowerCase().contains("wavelink")) {
                     process.destroy();
+                    firstCheck = 1;
                     return true;
                 }
             }
             process.destroy();
+            firstCheck = 1;
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        firstCheck = 1;
         return false;
     }
 
 
     private boolean isAppRunningWin() {
         try {
-            //TODO: need to test
-            Process process = Runtime.getRuntime().exec("tasklist");
+            ProcessBuilder processBuilder = new ProcessBuilder("tasklist");
+            Process process = processBuilder.start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
             String line;
+
             while ((line = reader.readLine()) != null) {
-                //TODO: need to see what this returns on windows
-                if (line.contains("wavelink")) {
+                if (firstCheck == 0 ) {
+                    LOGGER.log(Level.FINEST, line);
+
+                }
+                if (line.contains("WaveLink.exe")) {
                     process.destroy();
+                    firstCheck = 1;
                     return true;
                 }
             }
+
+
+
+
+
+//            Process process = Runtime.getRuntime().exec("tasklist");
+//            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+//            String line;
+//            while ((line = reader.readLine()) != null) {
+//                if (firstCheck == 0 ) {
+//                    LOGGER.log(Level.FINEST, line);
+//
+//                }
+//                if (line.contains("WaveLink.exe")) {
+//                    process.destroy();
+//                    firstCheck = 1;
+//                    return true;
+//                }
+//            }
             reader.close();
             process.destroy();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        firstCheck = 1;
         return false;
     }
 }

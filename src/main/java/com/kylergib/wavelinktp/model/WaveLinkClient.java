@@ -43,6 +43,13 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
+        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+        if (newReceive.get("result").equals(null)) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
+            configsReceived = configsReceived + 1;
+            return;
+        }
 
 
 
@@ -253,16 +260,22 @@ public class WaveLinkClient extends WebSocketClient {
                 JSONObject params = (JSONObject) newReceive.get("params");
                 String identifier = (String) params.get("identifier");
                 String property = (String) params.get("property");
-                Boolean value = (Boolean) params.get("value");
-                for (Microphone mic: Status.allMics) {
-                    if (mic.getIdentifier().equals(identifier)) {
-                        if (property.equals("clipGuard")) {
-                            mic.setClipGuardOn(value);
-                        } else if (property.equals("lowCut")) {
-                            mic.setLowCutOn(value);
+                boolean isLowCut = property.equals("Microphone LowCut");
+                boolean isClipGuard = property.equals("Microphone Clipguard");
+                boolean isMute = property.equals("Microphone Mute");
+                if (isLowCut || isClipGuard || isMute){
+                    Boolean value = (Boolean) params.get("value");
+                    for (Microphone mic: Status.allMics) {
+                        if (mic.getIdentifier().equals(identifier)) {
+                            if (property.equals("clipGuard")) {
+                                mic.setClipGuardOn(value);
+                            } else if (property.equals("lowCut")) {
+                                mic.setLowCutOn(value);
+                            }
                         }
                     }
                 }
+
             } else if (method.equals("inputDisabled")) {
                 //TODO: see if what this does ?
                 JSONObject params = (JSONObject) newReceive.get("params");
@@ -318,8 +331,7 @@ public class WaveLinkClient extends WebSocketClient {
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, ex.toString());
-        ex.printStackTrace();
+        WaveLinkPlugin.LOGGER.log(Level.SEVERE, String.valueOf(ex.fillInStackTrace()));
 
     }
 
