@@ -37,14 +37,23 @@ public abstract class WaveLinkActions {
         params.put("property",property);
         //decides if it should increment the volume or not
         if (option.equals("Set")) {
-
             params.put("isAdjustVolume", false);
+
         } else {
+            System.out.println(4);
             params.put("isAdjustVolume", true);
-            if (!option.equals("Increase")) {
+            if (option.equals("Decrease")) {
                 value = (Integer) value * -1;
             }
         }
+        boolean isOutputVolume = property.equalsIgnoreCase("outputvolume");
+        boolean isGain = property.equalsIgnoreCase("gain");
+        boolean isBalance = property.equalsIgnoreCase("balance");
+        if (isOutputVolume || isGain || isBalance) {
+            value = (double) ((Integer) value / 100.0);
+        }
+
+
         params.put("value", value);
         actionSend(params,"setMicrophoneConfig",26);
     }
