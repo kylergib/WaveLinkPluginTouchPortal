@@ -43,6 +43,13 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
+        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+        if (newReceive.get("result").equals(null)) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
+            configsReceived = configsReceived + 1;
+            return;
+        }
 
 
 
@@ -324,11 +331,7 @@ public class WaveLinkClient extends WebSocketClient {
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, "client onerrr??");
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, ex.toString());
         WaveLinkPlugin.LOGGER.log(Level.SEVERE, String.valueOf(ex.fillInStackTrace()));
-        ex.printStackTrace();
-        ex.printStackTrace();
 
     }
 

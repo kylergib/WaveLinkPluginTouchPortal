@@ -12,20 +12,23 @@ import org.json.JSONObject;
 
 import java.awt.*;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
+import static java.util.logging.Level.FINEST;
 
 
 @Plugin(version = BuildConfig.VERSION_CODE, colorDark = "#203060", colorLight = "#4070F0", name = "Wave Link Plugin")
@@ -92,6 +95,14 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     @Setting(name = "IP", defaultValue = "localhost", maxLength = 15)
     private static String ipSetting;
+
+    /**
+     * Debug setting in touch portal
+     */
+    @Setting(name = "Debug", defaultValue = "1", maxLength = 15)
+    public static int debugSetting;
+
+
 
     /**
      * Constructor calling super
@@ -755,6 +766,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
         currentIp = ipSetting;
+        setLogLevel();
         boolean updateAvailable = checkForUpdate();
         if (updateAvailable) {
             waveLinkPlugin.sendShowNotification(
@@ -816,6 +828,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
+        setLogLevel();
         WaveLinkPlugin.LOGGER.log(Level.INFO, currentIp);
         WaveLinkPlugin.LOGGER.log(Level.INFO, ipSetting);
         WaveLinkPlugin.LOGGER.log(Level.INFO, String.valueOf(currentIp.equals(ipSetting)));
@@ -906,6 +919,87 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             LOGGER.log(Level.WARNING, e.toString());
         }
         firstRun = false;
+    }
+    public void setLogLevel() {
+        debugSetting = 4;
+        LOGGER.log(Level.INFO, "Log level is: " + debugSetting);
+        ConsoleHandler consoleHandler = (ConsoleHandler) Arrays.stream(LOGGER.getHandlers()).findFirst().get();
+        Level newLevel;
+
+        switch (debugSetting) {
+            case 2:
+                newLevel = Level.FINE;
+                break;
+            case 3:
+                newLevel = Level.FINER;
+                break;
+            case 4:
+                newLevel = FINEST;
+                break;
+            default:
+                newLevel = Level.INFO;
+        }
+        if (!consoleHandler.getLevel().equals(newLevel)) {
+            consoleHandler.setLevel(newLevel);
+            LOGGER.setLevel(newLevel);
+            LOGGER.log(Level.INFO, "Set new logger level to: " + newLevel);
+        }
+        if (debugSetting > 3) {
+            try {
+                System.out.println("1");
+                File folder = new File(".");
+
+                if (folder.exists() && folder.isDirectory()) {
+                    System.out.println("2");
+                    File[] files = folder.listFiles();
+                    int numLogs = 0;
+                    if (files != null) {
+                        System.out.println("3");
+                        LocalDateTime oldestFileDate = null;
+                        File oldestFile = null;
+
+                        for (File file : files) {
+                            System.out.println("4");
+                            if (file.isFile()) {
+                                System.out.println("5");
+                                //
+                                String filename = file.getName();
+                                if (filename.length() > 4 && filename.substring(filename.length() - 4).equals(".log")) {
+                                    System.out.println("6");
+                                    LocalDateTime fileDate = LocalDateTime.parse(filename.substring(7,filename.length() - 4));
+                                    if (oldestFile == null) oldestFile = file;
+                                    if (oldestFileDate == null) oldestFileDate = fileDate;
+                                    else if (oldestFileDate.isAfter(fileDate)) {
+                                        oldestFileDate = fileDate;
+                                        oldestFile = file;
+                                    }
+                                    numLogs += 1;
+                                }
+
+                            }
+                        }
+                        if (oldestFile != null && numLogs > 4) {
+                            System.out.println("7");
+                            oldestFile.delete();
+                            LOGGER.log(FINEST, String.format("Deleted log file: %s", oldestFile.getName()));
+                        }
+                        System.out.println("8");
+                    }
+                }
+//                System.out.println("9");
+//                LocalDateTime date = LocalDateTime.now();
+//                System.out.println("10");
+//                FileHandler fileHandler = new FileHandler(String.format("logfile%s.txt", date));
+//                System.out.println("11");
+//                LOGGER.addHandler(fileHandler);
+//                System.out.println("12");
+//                fileHandler.setFormatter(consoleHandler.getFormatter());
+//                LOGGER.log(FINEST, "Starting to output to logfile.log");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 
     private boolean isInput(Input input, String choice) {
