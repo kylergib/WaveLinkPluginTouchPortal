@@ -921,7 +921,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         firstRun = false;
     }
     public void setLogLevel() {
-        debugSetting = 4;
+//        debugSetting = 4;
         LOGGER.log(Level.INFO, "Log level is: " + debugSetting);
         ConsoleHandler consoleHandler = (ConsoleHandler) Arrays.stream(LOGGER.getHandlers()).findFirst().get();
         Level newLevel;
