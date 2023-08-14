@@ -44,7 +44,7 @@ public class WaveLinkClient extends WebSocketClient {
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
         WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
-        if (newReceive.get("result").equals(null)) {
+        if (newReceive.keySet().contains("result") && newReceive.get("result").equals(null)) {
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
             WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
             configsReceived = configsReceived + 1;
