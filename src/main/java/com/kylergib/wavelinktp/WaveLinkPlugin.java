@@ -102,6 +102,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @Setting(name = "Debug", defaultValue = "1", maxLength = 15)
     public static int debugSetting;
 
+    /**
+     * Monitor Wave link app in touch portal. 1 is true, 0 if false
+     */
+    @Setting(name = "Monitor Wave Link App", defaultValue = "1", maxLength = 15)
+    public static int monitorWaveLinkApp;
+
 
 
     /**
@@ -768,6 +774,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         currentIp = ipSetting;
         setLogLevel();
         boolean updateAvailable = checkForUpdate();
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
         if (updateAvailable) {
             waveLinkPlugin.sendShowNotification(
                     WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification",
@@ -779,9 +786,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         }
-        if (monitorAppThread == null && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
+        if (monitorAppThread == null && monitorWaveLinkApp == 1 && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
             monitorAppThread = new MonitorAppThread(this);
             monitorAppThread.start();
+
+
         } else {
             try {
                 connectToWaveLink();
@@ -829,9 +838,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
         setLogLevel();
-        WaveLinkPlugin.LOGGER.log(Level.INFO, currentIp);
-        WaveLinkPlugin.LOGGER.log(Level.INFO, ipSetting);
-        WaveLinkPlugin.LOGGER.log(Level.INFO, String.valueOf(currentIp.equals(ipSetting)));
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
         if (!currentIp.equals(ipSetting)) {
             currentIp = ipSetting;
             boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
@@ -850,12 +857,14 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (monitorActive && !isLocalhost) {
                 monitorAppThread.requestStop();
                 LOGGER.log(Level.INFO, "requested monitor to stop");
-            } else if (isLocalhost && !monitorActive) {
+            } else if (isLocalhost && !monitorActive && monitorWaveLinkApp == 1) {
                 monitorAppThread = new MonitorAppThread(this);
                 monitorAppThread.start();
                 LOGGER.log(Level.INFO, "requested monitor to start");
-                return;
+//                return;
 
+            } else if (isLocalhost && monitorActive && monitorWaveLinkApp == 0){ //monitor is now false, but thread is alive
+                monitorAppThread.requestStop();
             }
 
             try {
