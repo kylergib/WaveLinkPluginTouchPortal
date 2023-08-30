@@ -102,6 +102,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @Setting(name = "Debug", defaultValue = "1", maxLength = 15)
     public static int debugSetting;
 
+    /**
+     * Monitor Wave link app in touch portal. 1 is true, 0 if false
+     */
+    @Setting(name = "Monitor Wave Link App", defaultValue = "1", maxLength = 15)
+    public static int monitorWaveLinkApp;
+
 
 
     /**
@@ -242,10 +248,22 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      * Action to set input volume to a specific integer
      *
      */
-    @Action(description = "Set output volume", format = "Set output volume of: {$outputMixerId$} to {$volumeValue$}",
+    @Action(description = "Set output volume", format = "Set output volume of: {$outputMixerId$} to {$volumeValueString$}",
             categoryId = "WaveLinkOutputs", name="Set Output Volume")
-    private void actionSetOutputVolume(@Data(valueChoices = {"Local", "Stream", "Both"})  String[] outputMixerId, @Data(minValue = 0, maxValue = 100) Integer volumeValue) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + outputMixerId[0] + " - " + volumeValue);
+    private void actionSetOutputVolume(@Data(valueChoices = {"Local", "Stream", "Both"})  String[] outputMixerId, @Data() String volumeValueString) {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + outputMixerId[0] + " - " + volumeValueString);
+        Integer volumeValue = null;
+        try {
+            volumeValue = Integer.parseInt(volumeValueString);
+        } catch (NumberFormatException e) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetOutputVolume value could not be converted to number");
+            return;
+        }
+        if (volumeValue < 0 || volumeValue > 100) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetOutputVolume value has to be between 0 and 100. It was " + volumeValue);
+            return;
+        }
+
 
         if (outputMixerId[0].equals("Local") || outputMixerId[0].equals("Both")) {
             WaveLinkActions.setOutputConfig(Status.localPackageName,"Output Level",volumeValue);
@@ -411,26 +429,40 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     /**
      * Action to set input volume to a specific integer
      *
-     * @param integerValue Integer
+     * @param integerValueString Integer
      * @param choices list of strings
      * @param mixerId list of strings
      */
-    @Action(description = "Set input volume", format = "Set input volume of: {$choices$} to {$integerValue$} on mixer: {$mixerId$}",
+    @Action(description = "Set input volume", format = "Set input volume of: {$choices$} to {$integerValueString$} on mixer: {$mixerId$}",
             categoryId = "WaveLinkInputs", name="Set Input Volume")
-    private void actionSetInputVolume(@Data(stateId = "inputList")  String[] choices, @Data(minValue = 0, maxValue = 100) Integer integerValue,
+    private void actionSetInputVolume(@Data(stateId = "inputList")  String[] choices, @Data() String integerValueString,
                                       @Data(valueChoices = {"Local","Stream", "Both"}) String[] mixerId) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + integerValue + " - " + choices[0] + " - " + mixerId[0]);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + integerValueString + " - " + choices[0] + " - " + mixerId[0]);
+        Integer integerValue = null;
+        try {
+            integerValue = Integer.parseInt(integerValueString);
+        } catch (NumberFormatException e) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetInputVolume value could not be converted to number");
+            return;
+        }
+        if (integerValue < 0 || integerValue > 100) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetInputVolume value has to be between 0 and 100. It was " + integerValue);
+            return;
+        }
+
+
         //sorts through all inputs
+        int finalIntegerValue = integerValue;
         Status.allInputs.stream().filter(input -> isInput(input, choices[0])).forEach(input -> {
             if (isLocalMixer(mixerId[0])) {
-                WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume",integerValue);
-                input.setLocalMixerLevel(integerValue);
-                Status.setInputValue(input.getName(),integerValue,"Local");
+                WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume", finalIntegerValue);
+                input.setLocalMixerLevel(finalIntegerValue);
+                Status.setInputValue(input.getName(), finalIntegerValue,"Local");
             }
             if (isStreamMixer(mixerId[0])) {
-                WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", integerValue);
-                input.setStreamMixerLevel(integerValue);
-                Status.setInputValue(input.getName(),integerValue,"Stream");
+                WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", finalIntegerValue);
+                input.setStreamMixerLevel(finalIntegerValue);
+                Status.setInputValue(input.getName(), finalIntegerValue,"Stream");
             }
         });
     }
@@ -581,27 +613,69 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
     //Mic actions
-    @Action(description = "Change mic gain, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Gain: {$value$}",
+    @Action(description = "Change mic gain, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Gain: {$valueString$}",
             categoryId = "WaveLinkMics", name="Change Mic Gain")
-    private void actionSetMicrophoneGain(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+    private void actionSetMicrophoneGain(@Data(stateId = "micList") String[] choices, @Data() String valueString,
                                          @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophone received: " + " - " + choices[0] + " - " + value + " - " + options[0]);
+
+        Integer value = null;
+        try {
+            value = Integer.parseInt(valueString);
+        } catch (NumberFormatException e) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneGain value could not be converted to number");
+            return;
+        }
+        if (value < 0 || value > 40) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneGain value has to be between 0 and 40. It was " + value);
+            return;
+        }
+
+
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophone received: " + " - " + choices[0] + " - " + valueString + " - " + options[0]);
         WaveLinkActions.setMicOutputEnhancement("gain",choices[0],options[0],value);
     }
 
-    @Action(description = "Change mic output volume, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
+    @Action(description = "Change mic output volume, choose if you want to set it", format = "Mic: {$choices$} - {$options$} Volume: {$valueString$}",
             categoryId = "WaveLinkMics", name="Change Mic Output Volume")
-    private void actionSetMicrophoneOutputVolume(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+    private void actionSetMicrophoneOutputVolume(@Data(stateId = "micList") String[] choices, @Data() String valueString,
                                                  @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneOutputVolume received: " + choices[0] + " - " + value + " - " + options[0]);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneOutputVolume received: " + choices[0] + " - " + valueString + " - " + options[0]);
+
+        Integer value = null;
+        try {
+            value = Integer.parseInt(valueString);
+        } catch (NumberFormatException e) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneOutputVolume value could not be converted to number");
+            return;
+        }
+        if (value < 0 || value > 40) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneOutputVolume value has to be between 0 and 40. It was " + value);
+            return;
+        }
+
+
         WaveLinkActions.setMicOutputEnhancement("outputVolume",choices[0],options[0],value);
     }
 
-    @Action(description = "Change mic PC/Mic mix volume, choose if you want to set it\n(0 is is closer to mic and 100 is closer to PC)", format = "Mic: {$choices$} - {$options$} Volume: {$value$}",
+    @Action(description = "Change mic PC/Mic mix volume, choose if you want to set it\n(0 is is closer to mic and 100 is closer to PC)", format = "Mic: {$choices$} - {$options$} Volume: {$valueString$}",
             categoryId = "WaveLinkMics", name="Change Mic PC/Mic Mix Volume")
-    private void actionSetMicPcMix(@Data(stateId = "micList") String[] choices, @Data(minValue = 0,maxValue = 40) Integer value,
+    private void actionSetMicPcMix(@Data(stateId = "micList") String[] choices, @Data() String valueString,
                                    @Data(valueChoices = {"Set"}, defaultValue = "Set") String[] options) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicPcMix received: " + choices[0] + " - " + value + " - " + options[0]);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicPcMix received: " + choices[0] + " - " + valueString + " - " + options[0]);
+
+
+        Integer value = null;
+        try {
+            value = Integer.parseInt(valueString);
+        } catch (NumberFormatException e) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicPcMix value could not be converted to number");
+            return;
+        }
+        if (value < 0 || value > 40) {
+            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicPcMix value has to be between 0 and 40. It was " + value);
+            return;
+        }
+
         WaveLinkActions.setMicOutputEnhancement("balance",choices[0],options[0],value);
     }
 
@@ -609,6 +683,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             categoryId = "WaveLinkMics", name="Toggle Clip Guard")
     private void actionSetMicrophoneClipGuard(@Data(stateId = "micList") String[] choices) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophoneClipGuard received: " + choices[0]);
+
+
         WaveLinkActions.setMicOutputEnhancement("Microphone ClipGuard",choices[0],"Set",0);
 
     }
@@ -768,6 +844,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         currentIp = ipSetting;
         setLogLevel();
         boolean updateAvailable = checkForUpdate();
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
         if (updateAvailable) {
             waveLinkPlugin.sendShowNotification(
                     WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification",
@@ -779,9 +856,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         }
-        if (monitorAppThread == null && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
+        if (monitorAppThread == null && monitorWaveLinkApp == 1 && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
             monitorAppThread = new MonitorAppThread(this);
             monitorAppThread.start();
+
+
         } else {
             try {
                 connectToWaveLink();
@@ -829,9 +908,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
         setLogLevel();
-        WaveLinkPlugin.LOGGER.log(Level.INFO, currentIp);
-        WaveLinkPlugin.LOGGER.log(Level.INFO, ipSetting);
-        WaveLinkPlugin.LOGGER.log(Level.INFO, String.valueOf(currentIp.equals(ipSetting)));
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
         if (!currentIp.equals(ipSetting)) {
             currentIp = ipSetting;
             boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
@@ -850,12 +927,14 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (monitorActive && !isLocalhost) {
                 monitorAppThread.requestStop();
                 LOGGER.log(Level.INFO, "requested monitor to stop");
-            } else if (isLocalhost && !monitorActive) {
+            } else if (isLocalhost && !monitorActive && monitorWaveLinkApp == 1) {
                 monitorAppThread = new MonitorAppThread(this);
                 monitorAppThread.start();
                 LOGGER.log(Level.INFO, "requested monitor to start");
-                return;
+//                return;
 
+            } else if (isLocalhost && monitorActive && monitorWaveLinkApp == 0){ //monitor is now false, but thread is alive
+                monitorAppThread.requestStop();
             }
 
             try {
