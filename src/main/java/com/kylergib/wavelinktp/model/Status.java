@@ -231,7 +231,7 @@ public abstract class Status {
 
     }
     public static void getOutputs() {
-
+        allOutputs.clear();
         int id = (int) outputs.get("id");
         JSONObject resultJson = (JSONObject) outputs.get("result");
         String selectedOutput = (String) resultJson.get("selectedOutput");
