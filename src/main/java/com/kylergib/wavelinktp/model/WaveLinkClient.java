@@ -4,11 +4,15 @@ import com.kylergib.wavelinktp.WaveLinkPlugin;
 import com.kylergib.wavelinktp.WaveLinkPluginConstants;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.logging.Level;
 
 
@@ -22,6 +26,7 @@ public class WaveLinkClient extends WebSocketClient {
     private int configsReceived;
 
     private WaveLinkCallback configCallback;
+    private int realTimeUpdateCounter = 10;
 
     public WaveLinkClient(String ipAddress, int port) throws Exception {
         super(new URI("ws://" + ipAddress + ":" + port));
@@ -43,12 +48,110 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
-        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+//        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
         if (newReceive.keySet().contains("result") && newReceive.get("result").equals(null)) {
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
             WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
             configsReceived = configsReceived + 1;
             return;
+        }
+        if (newReceive.keySet().contains("method") && newReceive.get("method").equals("realTimeChanges")) {
+
+            if (realTimeUpdateCounter > 0) {
+                realTimeUpdateCounter -= 1;
+                return;
+            } else {
+                realTimeUpdateCounter = 10;
+            }
+            JSONObject params = (JSONObject) newReceive.get("params");
+            JSONArray mixerList = (JSONArray) params.get("MixerList");
+            mixerList.forEach(mixerInput -> {
+                String inputIdentifier = (String) ((JSONObject) mixerInput).get("identifier");
+                BigDecimal levelLeft = ((BigDecimal) ((JSONObject) mixerInput).get("levelLeft")).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal levelRight = ((BigDecimal) ((JSONObject) mixerInput).get("levelRight")).setScale(2, RoundingMode.HALF_UP);
+
+                for (Input input: Status.allInputs) {
+                    if (input.getIdentifier().equals(inputIdentifier)) {
+                        boolean levelChanged = false;
+//                        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(input.getLevelLeft() != levelLeft));
+//                        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(input.getLevelLeft()) + "-" +String.valueOf(levelLeft));
+//                        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(input.getLevelRight() != levelRight));
+                        if (input.getLevelLeft() == null) {
+                            input.setLevelLeft(levelLeft);
+                             levelChanged = true;
+                        } else if (input.getLevelLeft().compareTo(levelLeft) != 0) {
+                            input.setLevelLeft(levelLeft);
+                            levelChanged = true;
+                        }
+
+                        if (input.getLevelRight() == null) {
+                            input.setLevelRight(levelRight);
+                            levelChanged = true;
+                        } else if (input.getLevelRight().compareTo(levelRight) != 0) {
+                            input.setLevelRight(levelRight);
+                            levelChanged = true;
+                        }
+                        if (levelChanged) {
+//                            WaveLinkPlugin.LOGGER.log(Level.FINEST, "Input: " + input.getName() + " Left: " +
+//                                    input.getLevelLeft() + " - Right: " + input.getLevelRight());
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkLevelStates.state." + input.getLevelLeftStateId().replace(" ",""),input.getLevelLeft());
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkLevelStates.state." + input.getLevelRightStateId().replace(" ",""),input.getLevelRight());
+                        }
+
+                    }
+                }
+
+
+            });
+
+            JSONObject localMixer = (JSONObject) params.get("localMixer");
+            BigDecimal localLeft = ((BigDecimal) localMixer.get("levelLeft")).setScale(2,RoundingMode.HALF_UP);
+            BigDecimal localRight = ((BigDecimal) localMixer.get("levelRight")).setScale(2,RoundingMode.HALF_UP);
+            boolean localLevelChanged = false;
+            if (Status.localLeft == null) {
+                Status.localLeft = localLeft;
+                localLevelChanged = true;
+            } else if (Status.localLeft.compareTo(localLeft) != 0) {
+                Status.localLeft = localLeft;
+                localLevelChanged = true;
+            }
+            if (Status.localRight == null) {
+                Status.localRight = localRight;
+                localLevelChanged = true;
+            } else if (Status.localRight.compareTo(localRight) != 0) {
+                Status.localRight = localRight;
+                localLevelChanged = true;
+            }
+            boolean streamLevelChanged = false;
+            JSONObject streamMixer = (JSONObject) params.get("streamMixer");
+            BigDecimal streamLeft = (BigDecimal) streamMixer.get("levelLeft");
+            BigDecimal streamRight = (BigDecimal) streamMixer.get("levelRight");
+            if (Status.streamLeft == null) {
+                Status.streamLeft = streamLeft;
+                streamLevelChanged = true;
+            } else if (Status.streamLeft.compareTo(streamLeft) != 0) {
+                Status.streamLeft = streamLeft;
+                streamLevelChanged = true;
+            }
+            if (Status.streamRight == null) {
+                Status.streamRight = streamRight;
+                streamLevelChanged = true;
+            } else if (Status.streamRight.compareTo(streamRight) != 0) {
+                Status.streamRight = streamRight;
+                streamLevelChanged = true;
+            }
+            if (localLevelChanged) {
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalLeftLevel.ID,Status.localLeft);
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalRightLevel.ID,Status.localRight);
+                System.out.println(Status.localLeft);
+            }
+            if (streamLevelChanged) {
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamLeftLevel.ID,Status.streamLeft);
+                WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamRightLevel.ID,Status.streamRight);
+            }
+
+        } else {
+            WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
         }
 
 
@@ -109,12 +212,12 @@ public class WaveLinkClient extends WebSocketClient {
                         if (mixerId.equals(Status.localPackageName)) {
                             input.setLocalMixerMuted(value);
 
-                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Local",sendMute);
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getLocalMuteStateId().replace(" ",""),sendMute);
 
 
                         } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerMuted(value);
-                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Stream",sendMute);
+                            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getStreamMuteStateId().replace(" ",""),sendMute);
                         }
                     }
                 }
@@ -129,10 +232,10 @@ public class WaveLinkClient extends WebSocketClient {
                     if (input.getIdentifier().equals(inputIdentifier)) {
                         if (mixerId.equals(Status.localPackageName) && input.getLocalMixerLevel() != value) {
                             input.setLocalMixerLevel(value);
-                            Status.setInputValue(input.getName(),value,"Local");
+                            Status.setInputValue(value,"Local", input);
                         } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerLevel(value);
-                            Status.setInputValue(input.getName(),value,"Stream");
+                            Status.setInputValue(value,"Stream", input);
                         }
 
                     }
