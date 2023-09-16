@@ -1,5 +1,6 @@
 package com.kylergib.wavelinktp.model;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 /**
  * Inputs in wave link
@@ -17,6 +18,24 @@ public class Input {
     private int inputType;
     private Boolean pluginBypassLocal; //if false then it is not bypassing the filter/plugin
     private Boolean pluginBypassStream; //if false then it is not bypassing the filter/plugin
+    private BigDecimal levelLeft;
+    private BigDecimal levelRight;
+
+    //dynamic state info
+//    private final String stateCategoryId = "WaveLinkInputs";
+    private String localMuteStateId;
+    private String streamMuteStateId;
+    private String localFilterBypassStateId;
+    private String streamFilterBypassStateId;
+
+    private String levelLeftStateId;
+    private String levelRightStateId;
+    private String localVolumeStateId;
+    private String streamVolumeStateId;
+
+    private boolean statesSentToTP;
+
+
 
 
 
@@ -36,6 +55,99 @@ public class Input {
         this.inputType = inputType;
         this.pluginBypassLocal = pluginBypassLocal;
         this.pluginBypassStream = pluginBypassStream;
+    }
+
+
+//    public String getStateCategoryId() {
+//        return stateCategoryId;
+//    }
+
+    public String getLocalMuteStateId() {
+        return localMuteStateId;
+    }
+
+    public void setLocalMuteStateId(String localMuteStateId) {
+        this.localMuteStateId = localMuteStateId;
+    }
+
+    public String getStreamMuteStateId() {
+        return streamMuteStateId;
+    }
+
+    public void setStreamMuteStateId(String streamMuteStateId) {
+        this.streamMuteStateId = streamMuteStateId;
+    }
+
+    public String getLocalFilterBypassStateId() {
+        return localFilterBypassStateId;
+    }
+
+    public void setLocalFilterBypassStateId(String localFilterBypassStateId) {
+        this.localFilterBypassStateId = localFilterBypassStateId;
+    }
+
+    public String getStreamFilterBypassStateId() {
+        return streamFilterBypassStateId;
+    }
+
+    public void setStreamFilterBypassStateId(String streamFilterBypassStateId) {
+        this.streamFilterBypassStateId = streamFilterBypassStateId;
+    }
+
+    public String getLevelLeftStateId() {
+        return levelLeftStateId;
+    }
+
+    public void setLevelLeftStateId(String levelLeftStateId) {
+        this.levelLeftStateId = levelLeftStateId;
+    }
+
+    public String getLevelRightStateId() {
+        return levelRightStateId;
+    }
+
+    public void setLevelRightStateId(String levelRightStateId) {
+        this.levelRightStateId = levelRightStateId;
+    }
+
+    public String getLocalVolumeStateId() {
+        return localVolumeStateId;
+    }
+
+    public void setLocalVolumeStateId(String localVolumeStateId) {
+        this.localVolumeStateId = localVolumeStateId;
+    }
+
+    public String getStreamVolumeStateId() {
+        return streamVolumeStateId;
+    }
+
+    public void setStreamVolumeStateId(String streamVolumeStateId) {
+        this.streamVolumeStateId = streamVolumeStateId;
+    }
+
+    public boolean isStatesSentToTP() {
+        return statesSentToTP;
+    }
+
+    public void setStatesSentToTP(boolean statesSentToTP) {
+        this.statesSentToTP = statesSentToTP;
+    }
+
+    public BigDecimal getLevelLeft() {
+        return levelLeft;
+    }
+
+    public void setLevelLeft(BigDecimal levelLeft) {
+        this.levelLeft = levelLeft;
+    }
+
+    public BigDecimal getLevelRight() {
+        return levelRight;
+    }
+
+    public void setLevelRight(BigDecimal levelRight) {
+        this.levelRight = levelRight;
     }
 
     public int getId() {

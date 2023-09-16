@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -307,7 +308,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 }
                 WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, Status.localPackageName);
                 input.setPluginBypassLocal(setFilter);
-                waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "LocalFilterBypass", input.getPluginBypassLocal());
+                waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getLocalFilterBypassStateId().replace(" ", ""), input.getPluginBypassLocal());
 
             }
             if (isStreamMixer(mixerId[0])) {
@@ -318,7 +319,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 }
                 WaveLinkActions.setFilterByPass(input.getIdentifier(), setFilter, Status.streamPackageName);
                 input.setPluginBypassStream(setFilter);
-                waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "StreamFilterBypass", input.getPluginBypassStream());
+                waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getStreamFilterBypassStateId().replace(" ", ""), input.getPluginBypassStream());
 
             }
 
@@ -355,9 +356,9 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 if (newValueLocal) {
                     mutedValue = "muted";
                 }
-                String inputStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Local";
-                waveLinkPlugin.sendStateUpdate(inputStateId, mutedValue);
-                System.out.println(inputStateId + " - " + mutedValue);
+                String localMuteStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getLocalMuteStateId().replace(" ","");
+                waveLinkPlugin.sendStateUpdate(localMuteStateId, mutedValue);
+//                System.out.println(localMuteStateId + " - " + mutedValue);
             }
             if (isStreamMixer(mixerId[0])) {
                 if (value[0].equals("toggle")) {
@@ -371,9 +372,9 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 }
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Mute", newValueStream);
                 input.setStreamMixerMuted(newValueStream);
-                String inputStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Stream";
-                waveLinkPlugin.sendStateUpdate(inputStateId, mutedValue);
-                System.out.println(inputStateId + " - " + mutedValue);
+                String streamMuteStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getStreamMuteStateId().replace(" ","");
+                waveLinkPlugin.sendStateUpdate(streamMuteStateId, mutedValue);
+                System.out.println(streamMuteStateId + " - " + mutedValue);
 
             }
         });
@@ -419,7 +420,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
                     inputPlugin.setIsActive(newValue);
                     WaveLinkActions.setInputFilter(input.getIdentifier(),inputPlugin.getFilterID(),newValue);
-                            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + stateId,stateIdValue);
+                    waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + stateId,stateIdValue);
                     System.out.println(stateId + " - " + stateIdValue);
 
                 });
@@ -457,12 +458,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (isLocalMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume", finalIntegerValue);
                 input.setLocalMixerLevel(finalIntegerValue);
-                Status.setInputValue(input.getName(), finalIntegerValue,"Local");
+                Status.setInputValue(finalIntegerValue,"Local", input);
             }
             if (isStreamMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", finalIntegerValue);
                 input.setStreamMixerLevel(finalIntegerValue);
-                Status.setInputValue(input.getName(), finalIntegerValue,"Stream");
+                Status.setInputValue(finalIntegerValue,"Stream",input);
             }
         });
     }
@@ -486,7 +487,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void updateInputs() throws InterruptedException {
         if (!firstRun) {
             Status.allInputs.clear();
-            Status.getInput();
+//            Status.getInput();
             WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
             client.send(getInputConfigs.getJsonString());
         }
@@ -501,30 +502,31 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
             //create dynamic states and set it to null
-            if (!Status.sentStates.contains(input.getName().replace(" ",""))) {
-                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "Local", input.getName() + " Local", "null");
-                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "Stream", input.getName() + " Stream", "null");
-                //create states for filters
-                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "LocalFilterBypass", input.getName() + " Local Filter Bypass", "null");
-                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "StreamFilterBypass", input.getName() + " Stream Filter Bypass", "null");
-
-                Status.sentStates.add(input.getName().replace(" ",""));
-                System.out.println("Sent state: " + input.getName().replace(" ",""));
-
-                //TODO: adding states for each input
-                //NEW
-                input.getPlugins().forEach(inputPlugin -> {
-                    String inputFilterStateId = input.getName().replace(" ", "") + "Filter" + inputPlugin.getName();
-                    String inputFilterStateDescription = input.getName() + " " + inputPlugin.getName() + " (Filter)";
-                    String stateIdValue;
-                    if (inputPlugin.getIsActive()) stateIdValue = "active";
-                    else stateIdValue = "inactive";
-
-                    waveLinkPlugin.sendCreateState("WaveLinkInputs", inputFilterStateId,
-                            inputFilterStateDescription, stateIdValue);
-
-
-                });
+            if (!input.isStatesSentToTP()) {
+                sendDynamicStates(input);
+//                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "Local", input.getName() + " Local", "null");
+//                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "Stream", input.getName() + " Stream", "null");
+//                //create states for filters
+//                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "LocalFilterBypass", input.getName() + " Local Filter Bypass", "null");
+//                waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "StreamFilterBypass", input.getName() + " Stream Filter Bypass", "null");
+//
+//                Status.sentStates.add(input.getName().replace(" ",""));
+//                System.out.println("Sent state: " + input.getName().replace(" ",""));
+//
+//                //TODO: adding states for each input
+//                //NEW
+//                input.getPlugins().forEach(inputPlugin -> {
+//                    String inputFilterStateId = input.getName().replace(" ", "") + "Filter" + inputPlugin.getName();
+//                    String inputFilterStateDescription = input.getName() + " " + inputPlugin.getName() + " (Filter)";
+//                    String stateIdValue;
+//                    if (inputPlugin.getIsActive()) stateIdValue = "active";
+//                    else stateIdValue = "inactive";
+//
+//                    waveLinkPlugin.sendCreateState("WaveLinkInputs", inputFilterStateId,
+//                            inputFilterStateDescription, stateIdValue);
+//
+//
+//                });
             }
 
 
@@ -538,6 +540,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
     public void updateInputValues() {
+        System.out.println("STARTING input UPDATE");
         Status.allInputs.forEach(input -> {
 
             String localMutedValue = "unmuted";
@@ -551,15 +554,16 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
 
             //updates states with values of muted or unmuted so it will update any buttons when the plugin loads
-            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Local",localMutedValue);
-            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ","") + "Stream",streamMutedValue);
+            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getLocalMuteStateId().replace(" ",""),localMutedValue);
+            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getStreamMuteStateId().replace(" ",""),streamMutedValue);
 
-            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "LocalFilterBypass", input.getPluginBypassLocal());
-            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state." + input.getName().replace(" ", "") + "StreamFilterBypass", input.getPluginBypassStream());
+            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getLocalFilterBypassStateId().replace(" ", ""), input.getPluginBypassLocal());
+            waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getStreamFilterBypassStateId().replace(" ", ""), input.getPluginBypassStream());
 
-            Status.setInputValue(input.getName(), input.getLocalMixerLevel(), "Local");
-            Status.setInputValue(input.getName(), input.getStreamMixerLevel(), "Stream");
+            Status.setInputValue(input.getLocalMixerLevel(), "Local", input);
+            Status.setInputValue(input.getStreamMixerLevel(), "Stream", input);
         });
+        System.out.println("ending inputs UPDATE");
 
     }
     public void updateOutputs() {
@@ -591,7 +595,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
         waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.OutputList.ID, allOutputsString);
-
+        System.out.println("ending OUTPUTS UPDATE");
     }
 
     public void updateMics() {
@@ -728,8 +732,26 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @State(defaultValue = "", categoryId = "WaveLinkOutputs",desc = "Local Mixer Output")
     private String localMixOut;
 
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Local Mixer Left Level")
+    private String localLeftLevel;
+
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Local Mixer Right Level")
+    private String localRightLevel;
+
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Local Mixer Volume")
+    private String localVolume;
+
     @State(defaultValue = "", categoryId = "WaveLinkOutputs",desc = "Stream Mixer Output")
     private String streamMixOut;
+
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Stream Mixer Left Level")
+    private String streamLeftLevel;
+
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Stream Mixer Right Level")
+    private String streamRightLevel;
+
+    @State(defaultValue = "", categoryId = "WaveLinkOutputs", desc = "Stream Mixer Volume")
+    private String streamVolume;
 
     @State(defaultValue = "",categoryId = "WaveLinkOutputs", desc = "Monitor Mix Selected")
     private String monitoredMix;
@@ -1140,5 +1162,45 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         return false;
     }
 
+    public void sendDynamicStates(Input input) {
+        //todo: left off, next to to update the send update states and add output level states
+        LOGGER.log(Level.FINER, "Trying to send states for input: " + input.getName());
+        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getLocalMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getLocalMuteStateId(), input.getLocalMixerMuted());
+        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getStreamMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getStreamMuteStateId(), input.getStreamMixerMuted());
 
+
+        waveLinkPlugin.sendCreateState("WaveLinkFilterStates",input.getLocalFilterBypassStateId().replace(" ", ""),"Wave Link Filter States",input.getLocalFilterBypassStateId(), input.getPluginBypassLocal());
+        waveLinkPlugin.sendCreateState("WaveLinkFilterStates",input.getStreamFilterBypassStateId().replace(" ", ""),"Wave Link Filter States",input.getStreamFilterBypassStateId(), input.getPluginBypassStream());
+        BigDecimal levelLeft = BigDecimal.valueOf(0.0);
+        BigDecimal levelRight = BigDecimal.valueOf(0.0);
+        if (input.getLevelLeft() != null) {
+            levelLeft = input.getLevelLeft();
+        }
+        if (input.getLevelRight() != null) {
+            levelRight = input.getLevelRight();
+        }
+        waveLinkPlugin.sendCreateState("WaveLinkLevelStates", input.getLevelLeftStateId().replace(" ", ""),"Wave Link Level States",input.getLevelLeftStateId(),levelLeft);
+        waveLinkPlugin.sendCreateState("WaveLinkLevelStates", input.getLevelRightStateId().replace(" ", ""),"Wave Link Level States",input.getLevelRightStateId(),levelRight);
+
+        waveLinkPlugin.sendCreateState("WaveLinkVolumeStates",input.getLocalVolumeStateId().replace(" ", ""),"Wave Link Volume States",input.getLocalVolumeStateId(),input.getLocalMixerLevel());
+        waveLinkPlugin.sendCreateState("WaveLinkVolumeStates",input.getStreamVolumeStateId().replace(" ", ""),"Wave Link Volume States",input.getStreamVolumeStateId(),input.getStreamMixerLevel());
+
+
+        input.getPlugins().forEach(inputPlugin -> {
+            String inputFilterStateId = input.getName().replace(" ", "") + "Filter" + inputPlugin.getName();
+            String inputFilterStateDescription = input.getName() + " " + inputPlugin.getName() + " (Filter)";
+            String stateIdValue;
+            if (inputPlugin.getIsActive()) stateIdValue = "active";
+            else stateIdValue = "inactive";
+            waveLinkPlugin.sendCreateState("WaveLinkFilterStates", inputFilterStateId,"Wave Link Filter States",
+                    inputFilterStateDescription, stateIdValue);
+        });
+
+
+
+        input.setStatesSentToTP(true);
+        LOGGER.log(Level.FINER, "Sent states for input: " + input.getName());
+
+
+    }
 }

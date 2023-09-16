@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Base64;
@@ -56,6 +57,13 @@ public abstract class Status {
     public static final String streamPackageName = "com.elgato.mix.stream";
 
     public static ArrayList<String> sentStates = new ArrayList<>();
+    public static BigDecimal localLeft;
+    public static BigDecimal localRight;
+    public static int localVolume;
+    public static BigDecimal streamLeft;
+    public static BigDecimal streamRight;
+    public static int streamVolume;
+
 
 
     public static void getSwitchState() {
@@ -188,6 +196,24 @@ public abstract class Status {
                     streamMixerMuted,localMixerMuted,localMixerLevel,
                     streamMixerLevel,inputPlugins,inputType, pluginBypassLocal,
                     pluginBypassStream);
+            newInput.setLocalMuteStateId(newInput.getName() + " Local Mute");
+            newInput.setStreamMuteStateId(newInput.getName() + " Stream Mute");
+            newInput.setLocalFilterBypassStateId(newInput.getName() + " Local Filter Bypass");
+            newInput.setStreamFilterBypassStateId(newInput.getName() + " Stream Filter Bypass");
+
+            newInput.setLevelLeftStateId(newInput.getName() + " Level Left");
+            newInput.setLevelRightStateId(newInput.getName() + " Level Right");
+            newInput.setLocalVolumeStateId(newInput.getName() + " Local Volume");
+            newInput.setStreamVolumeStateId(newInput.getName() + " Stream Volume");
+
+
+//            WaveLinkPlugin.waveLinkPlugin.sendCreateState("WaveLinkInputs", );
+//            waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "Stream", input.getName() + " Stream", "null");
+//            //create states for filters
+//            waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "LocalFilterBypass", input.getName() + " Local Filter Bypass", "null");
+//            waveLinkPlugin.sendCreateState("WaveLinkInputs", input.getName().replace(" ", "") + "StreamFilterBypass", input.getName() + " Stream Filter Bypass", "null");
+
+
             if (!allInputs.isEmpty()) {
                 Boolean shouldAdd = true;
                 for (Input allInput : allInputs) {
@@ -199,9 +225,14 @@ public abstract class Status {
                 }
                 if (shouldAdd) {
                     allInputs.add(newInput);
+                    System.out.println("Should attempt to send");
+                    WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
+                    System.out.println("after attempt to send");
                 }
-            } else {
+            }
+            else {
                 allInputs.add(newInput);
+                WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
             }
         }
 
@@ -258,18 +289,26 @@ public abstract class Status {
 
     }
 
-    public static void setInputValue(String inputName, int value, String mixerName) {
+    public static void setInputValue(int value, String mixerName, Input input) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector.data.mixerId", mixerName);
-        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", inputName);
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", input.getName());
         WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID,value,data);
+//        if (mixerName.equals("Local"))
+
+        String stateId = (mixerName.equals("Local")) ? input.getLocalVolumeStateId().replace(" ","") : input.getStreamVolumeStateId().replace(" ","");
+        WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkVolumeStates.state." + stateId,value);
     }
 
     public static void setOutputValue(int value, String mixerName) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.connector.outputVolumeConnector.data.outputMixerId", mixerName);
         WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
-
+       if (mixerName.equals("Local")) {
+           WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalVolume.ID, value);
+       } else {
+           WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamVolume.ID, value);
+       }
     }
 
 }
