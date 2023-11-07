@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -25,22 +26,30 @@ public class WaveLinkClient extends WebSocketClient {
     private String host;
     private int configsReceived;
 
-    private WaveLinkCallback configCallback;
+    private final static Logger LOGGER = Logger.getLogger(WaveLinkClient.class.getName());
+
+    private WaveLinkCallback waveLinkCallback;
     private int realTimeUpdateCounter = 10;
+
+//    public interface connectedToWaveLink {
+//        void onConnected();
+//        void onDisconnected();
+//        void connectedToDifferentApp();
+//    }
 
     public WaveLinkClient(String ipAddress, int port) throws Exception {
         super(new URI("ws://" + ipAddress + ":" + port));
         this.port = port;
         this.host = ipAddress;
         this.configsReceived = 0;
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to: " + ipAddress + " using port: " + port);
+        LOGGER.log(Level.INFO, "Trying to connect to: " + ipAddress + " using port: " + port);
         connect();
 
     }
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Connected to Wave Link on Port: " + port);
+        LOGGER.log(Level.INFO, "Connected to Wave Link on Port: " + port);
         WaveLinkPlugin.latch.countDown();
     }
 
@@ -48,10 +57,11 @@ public class WaveLinkClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
-//        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+        LOGGER.log(Level.FINER, String.valueOf(newReceive));
+        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
         if (newReceive.keySet().contains("result") && newReceive.get("result").equals(null)) {
-            WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
-            WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
+            LOGGER.log(Level.WARNING, "Result was null");
+            LOGGER.log(Level.WARNING, String.valueOf(newReceive));
             configsReceived = configsReceived + 1;
             return;
         }
@@ -151,7 +161,7 @@ public class WaveLinkClient extends WebSocketClient {
             }
 
         } else {
-            WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+            LOGGER.log(Level.FINER, String.valueOf(newReceive));
         }
 
 
@@ -159,6 +169,13 @@ public class WaveLinkClient extends WebSocketClient {
         if (newReceive.keySet().contains("id")) {
             //id in message matches what the client sent from WaveLinkPlugin class
             if ((int) newReceive.get("id") == 11) {
+                // need to check what appName is, if it is "Elgato Wave Link" continue, if not need to close
+                JSONObject result = newReceive.getJSONObject("result");
+                if (!result.get("appName").equals("Elgato Wave Link")) {
+                    LOGGER.log(Level.WARNING, "Connected to wrong app. Will try another port");
+                    waveLinkCallback.onConnectedToWrongApp();
+                }
+
                 Status.applicationInfo = new JSONObject(message);
                 configsReceived = configsReceived + 1;
 
@@ -189,7 +206,7 @@ public class WaveLinkClient extends WebSocketClient {
 
             }
             if (configsReceived == 6) {
-                configCallback.onConfigsReceived();
+                waveLinkCallback.onConfigsReceived();
                 configsReceived = 0;
             }
 
@@ -428,18 +445,18 @@ public class WaveLinkClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "WebSocket connection closed: " + reason);
+        LOGGER.log(Level.INFO, "WebSocket connection closed: " + reason);
         WaveLinkPlugin.latch.countDown();
     }
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, String.valueOf(ex.fillInStackTrace()));
+        LOGGER.log(Level.SEVERE, String.valueOf(ex.fillInStackTrace()));
 
     }
 
-    public void setConfigCallback(WaveLinkCallback configCallback) {
-        this.configCallback = configCallback;
+    public void setConfigCallback(WaveLinkCallback waveLinkCallback) {
+        this.waveLinkCallback = waveLinkCallback;
     }
 
 
