@@ -138,12 +138,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 //        firstRun = true;
 //        port = 1824;
 
-        client = new WaveLinkClient(ipSetting, port);
+        client = new WaveLinkClient(ipSetting, port, this);
         Thread.sleep(100);
-        if (client.isOpen()) {
-            LOGGER.log(Level.INFO, "Connected to wave link? " + port);
-            client.setConfigCallback(this);
-        }
+//        if (client.isOpen()) {
+//            LOGGER.log(Level.INFO, "Connected to wave link? " + port);
+//            client.setConfigCallback(this);
+//        }
 //        client.connect();
 //        while (true) {
 //            latch.await();
@@ -875,7 +875,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         port = 1824;
         try {
             connectToWaveLink(port);
-            Thread.sleep(200);
+            Thread.sleep(100);
+            LOGGER.log(Level.FINER, String.valueOf(client.isOpen()));
             while (client != null && !client.isOpen()) {
                 port++;
                 connectToWaveLink(port);
@@ -883,8 +884,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 if (port > 1829) port = 1823;
                 Thread.sleep(100);
             }
-            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
-            client.send(getAppInfo.getJsonString());
+//            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//            client.send(getAppInfo.getJsonString());
 
 //            if () {
 //                connectToWaveLink(port++);
@@ -1060,6 +1061,59 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 //            port = port + 1;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+
+    }
+    @Override
+    public void onConnectedToWaveLink() {
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
+//        SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
+//        SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
+//        Status.switchStates.add(localSwitch);
+//        Status.switchStates.add(streamSwitch);
+//        Status.switchMap.put("localMixer", Status.localPackageName);
+//        Status.switchMap.put("streamMixer", Status.streamPackageName);
+//
+////    sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
+//        WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//        client.send(getAppInfo.getJsonString());
+//        WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
+//        client.send(getMicrophoneConfig.getJsonString());
+//        WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
+//        client.send(getSwitchState.getJsonString());
+//        WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
+//        client.send(getOutputConfig.getJsonString());
+//        WaveJson getOutputs = new WaveJson("getOutputs", 15);
+//        client.send(getOutputs.getJsonString());
+//        WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
+//        client.send(getInputConfigs.getJsonString());
+
+        // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
+    }
+
+    @Override
+    public void onWaveLinkDisconnected() {
+        port = 1824;
+        try {
+            connectToWaveLink(port);
+            Thread.sleep(100);
+            LOGGER.log(Level.FINER, String.valueOf(client.isOpen()));
+            while (client != null && !client.isOpen()) {
+                port++;
+                connectToWaveLink(port);
+
+                if (port > 1829) port = 1823;
+                Thread.sleep(100);
+            }
+//            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//            client.send(getAppInfo.getJsonString());
+
+//            if () {
+//                connectToWaveLink(port++);
+//            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, e.toString());
         }
 
     }
