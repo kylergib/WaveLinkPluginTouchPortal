@@ -99,7 +99,7 @@ public abstract class Status {
                 if (localMixerMuted) {
                     sendMute = "muted";
                 }
-                setOutputValue(localMixerLevel,"Local");
+                WaveLinkPlugin.setOutputValue(localMixerLevel,"Local");
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalMixOut.ID,sendMute);
             } else if (switchState.getMixerId().equals(switchMap.get("streamMixer"))) {
                 switchState.setLevel(streamMixerLevel);
@@ -109,7 +109,7 @@ public abstract class Status {
                     sendMute = "muted";
                 }
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID,sendMute);
-                setOutputValue(streamMixerLevel, "Stream");
+                WaveLinkPlugin.setOutputValue(streamMixerLevel, "Stream");
             }
 
         }
@@ -133,33 +133,33 @@ public abstract class Status {
             String name = (String) tempJson.get("name");
             Boolean isAvailable = (Boolean) tempJson.get("isAvailable");
 
-            //testing
-            String iconData = (String) tempJson.get("iconData");
-            byte[] decodedIcon = Base64.getDecoder().decode(iconData);
-
-
-            String folderPath = "icons";
-            File folder = new File(folderPath);
-            if (!folder.exists()) {
-                boolean created = folder.mkdirs();
-                if (!created) {
-                    System.out.println("Failed to create the folder.");
-                    return;
-                }
-            }
-
-            // Saving as a file
-            if (!iconData.isEmpty()) {
-                String fileName = folderPath + File.separator + name + "Image.png";
-                try (FileOutputStream fos = new FileOutputStream(fileName)) {
-                    fos.write(decodedIcon);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-
-            //end testing
+//            //testing
+//            String iconData = (String) tempJson.get("iconData");
+//            byte[] decodedIcon = Base64.getDecoder().decode(iconData);
+//
+//
+//            String folderPath = "icons";
+//            File folder = new File(folderPath);
+//            if (!folder.exists()) {
+//                boolean created = folder.mkdirs();
+//                if (!created) {
+//                    System.out.println("Failed to create the folder.");
+//                    return;
+//                }
+//            }
+//
+//            // Saving as a file
+//            if (!iconData.isEmpty()) {
+//                String fileName = folderPath + File.separator + name + "Image.png";
+//                try (FileOutputStream fos = new FileOutputStream(fileName)) {
+//                    fos.write(decodedIcon);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//
+//
+//            //end testing
 
             JSONArray streamMixer = (JSONArray) tempJson.get("streamMixer"); //isMuted, level, unknown
             Boolean streamMixerMuted = (Boolean) streamMixer.get(0);
@@ -205,6 +205,8 @@ public abstract class Status {
             newInput.setLevelRightStateId(newInput.getName() + " Level Right");
             newInput.setLocalVolumeStateId(newInput.getName() + " Local Volume");
             newInput.setStreamVolumeStateId(newInput.getName() + " Stream Volume");
+//            setInputValue(streamMixerLevel, "Stream", newInput);
+//            setInputValue(localMixerLevel, "Local", newInput);
 
 
 //            WaveLinkPlugin.waveLinkPlugin.sendCreateState("WaveLinkInputs", );
@@ -225,15 +227,20 @@ public abstract class Status {
                 }
                 if (shouldAdd) {
                     allInputs.add(newInput);
-                    System.out.println("Should attempt to send");
+//                    System.out.println("Should attempt to send");
                     WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
-                    System.out.println("after attempt to send");
+//                    System.out.println("after attempt to send");
                 }
             }
             else {
                 allInputs.add(newInput);
                 WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
             }
+        }
+        try {
+            WaveLinkPlugin.waveLinkPlugin.updateInputs();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
 
     }
@@ -245,17 +252,26 @@ public abstract class Status {
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
             String identifier = (String) tempJson.get("identifier");
-            String name = (String) tempJson.get("name");
+            Boolean isMicMuted = (Boolean)  tempJson.get("isMicMuted");
+            BigDecimal outputVolume = (BigDecimal) tempJson.get("outputVolume");
             Boolean isClipGuardOn = (Boolean)  tempJson.get("isClipGuardOn");
+            int lowCutType = tempJson.getInt("lowCutType"); //unsure what this is for
+            BigDecimal gain = (BigDecimal) tempJson.get("gain");
+            Boolean isWaveXLR = (Boolean)  true;
+            Boolean isWaveLink = (Boolean)  true;
+//            JSONArray outputVolumeLookup = (JSONArray) tempJson.get("outputVolumeLookup"); //unsure what this is for
+            BigDecimal balance = (BigDecimal) tempJson.get("balance");
             Boolean isLowCutOn = (Boolean)  tempJson.get("isLowCutOn");
-            Boolean isWaveLink = (Boolean)  tempJson.get("isWaveLink");
-            Boolean isWaveXLR = (Boolean)  tempJson.get("isWaveXLR");
-            int lowCutType = (int) tempJson.get("lowCutType");
-            Microphone newMicrophone = new Microphone(identifier,isClipGuardOn,isLowCutOn,
-                    isWaveLink,isWaveXLR,lowCutType,name);
+            String name = (String) tempJson.get("name");
+            Boolean isGainLocked = tempJson.getBoolean("isGainLocked");
+//            JSONArray gainLookup = (JSONArray) tempJson.get("gainLookup"); //unsure what this is for
+            Microphone newMicrophone = new Microphone(identifier,isMicMuted,outputVolume,
+                    isClipGuardOn,lowCutType,gain,isWaveXLR,isWaveLink,
+                    balance,isLowCutOn,name,isGainLocked);
             allMics.add(newMicrophone);
 
         }
+        WaveLinkPlugin.waveLinkPlugin.updateMics();
 
 
 
@@ -271,7 +287,7 @@ public abstract class Status {
         for (int i = 0; i < newOutputs.length(); i++) {
             JSONObject tempJson = (JSONObject) newOutputs.get(i);
             String identifier = (String) tempJson.get("identifier");
-            String name = (String) tempJson.get("name");
+            String name = identifier.contains("SystemDefault") ? "System Default" : (String) tempJson.get("name");
             Boolean isSelected = false;
             Output newOutput = new Output(identifier, name, isSelected);
             if (identifier.equals(selectedOutput)) {
@@ -286,29 +302,10 @@ public abstract class Status {
 
 
         }
+        WaveLinkPlugin.waveLinkPlugin.updateOutputs();
 
     }
 
-    public static void setInputValue(int value, String mixerName, Input input) {
-        HashMap<String, Object> data = new HashMap<>();
-        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector.data.mixerId", mixerName);
-        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", input.getName());
-        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID,value,data);
-//        if (mixerName.equals("Local"))
 
-        String stateId = (mixerName.equals("Local")) ? input.getLocalVolumeStateId().replace(" ","") : input.getStreamVolumeStateId().replace(" ","");
-        WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkVolumeStates.state." + stateId,value);
-    }
-
-    public static void setOutputValue(int value, String mixerName) {
-        HashMap<String, Object> data = new HashMap<>();
-        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.connector.outputVolumeConnector.data.outputMixerId", mixerName);
-        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
-       if (mixerName.equals("Local")) {
-           WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalVolume.ID, value);
-       } else {
-           WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamVolume.ID, value);
-       }
-    }
 
 }
