@@ -186,8 +186,8 @@ public class WaveLinkClient extends WebSocketClient {
 
         if (newReceive.keySet().contains("id")) {
             WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
-            System.out.println(String.valueOf(newReceive));
-            System.out.println();
+//            System.out.println(String.valueOf(newReceive));
+//            System.out.println();
             //id in message matches what the client sent from WaveLinkPlugin class
             if ((int) newReceive.get("id") == 11) {
                 // need to check what appName is, if it is "Elgato Wave Link" continue, if not need to close
@@ -251,7 +251,7 @@ public class WaveLinkClient extends WebSocketClient {
 
 
             }
-            if (configsReceived == 6) {
+            if (configsReceived == 5) {
                 waveLinkCallback.onConfigsReceived();
                 configsReceived = 0;
             }
@@ -295,10 +295,10 @@ public class WaveLinkClient extends WebSocketClient {
                     if (input.getIdentifier().equals(inputIdentifier)) {
                         if (mixerId.equals(Status.localPackageName) && input.getLocalMixerLevel() != value) {
                             input.setLocalMixerLevel(value);
-                            WaveLinkPlugin.setInputValue(value,"Local", input);
+                            WaveLinkPlugin.setInputValue(value,"Local", input, true);
                         } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerLevel(value);
-                            WaveLinkPlugin.setInputValue(value,"Stream", input);
+                            WaveLinkPlugin.setInputValue(value,"Stream", input, true);
                         }
 
                     }
@@ -340,7 +340,7 @@ public class WaveLinkClient extends WebSocketClient {
                 for (SwitchState switchState : Status.switchStates) {
                     if (switchState.getMixerId().equals(mixerId)) {
                         switchState.setLevel(value);
-                        WaveLinkPlugin.setOutputValue(value, switchState.getMixerName());
+                        WaveLinkPlugin.setOutputValue(value, switchState.getMixerName(), true);
                     }
                 }
 

@@ -99,7 +99,7 @@ public abstract class Status {
                 if (localMixerMuted) {
                     sendMute = "muted";
                 }
-                WaveLinkPlugin.setOutputValue(localMixerLevel,"Local");
+                WaveLinkPlugin.setOutputValue(localMixerLevel,"Local", true);
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalMixOut.ID,sendMute);
             } else if (switchState.getMixerId().equals(switchMap.get("streamMixer"))) {
                 switchState.setLevel(streamMixerLevel);
@@ -109,7 +109,7 @@ public abstract class Status {
                     sendMute = "muted";
                 }
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID,sendMute);
-                WaveLinkPlugin.setOutputValue(streamMixerLevel, "Stream");
+                WaveLinkPlugin.setOutputValue(streamMixerLevel, "Stream", true);
             }
 
         }

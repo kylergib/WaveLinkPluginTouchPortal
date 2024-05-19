@@ -44,7 +44,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     private Boolean firstRun;
 //    private static boolean appIsOpen;
     private int port;
-    private final ApiHandler apiHandler = new ApiHandler(1000,this);
+    private final ApiHandler apiHandler = new ApiHandler(100,this);
 
     @Override
     public void onStateCreate(StateCreateInfo update) {
@@ -61,15 +61,20 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     @Override
     public boolean sendStateUpdate(String stateId, Object value) {
-        apiHandler.addStateUpdate(new StateUpdateInfo(stateId, value));
-        return true;
-//        return this.sendStateUpdate(stateId, value, false, false);
+        if (firstRun) {
+            apiHandler.addStateUpdate(new StateUpdateInfo(stateId, value));
+            return true;
+        }
+
+        return this.sendStateUpdate(stateId, value, false, false);
     }
     @Override
     public boolean sendCreateState(String categoryId, String stateId, String description, Object value) {
-        apiHandler.addStateCreate(new StateCreateInfo(categoryId, stateId, description, value));
-        return true;
-//        return this.sendCreateState(categoryId, stateId, null, description, value, false, false);
+        if (firstRun) {
+            apiHandler.addStateCreate(new StateCreateInfo(categoryId, stateId, description, value));
+            return true;
+        }
+        return this.sendCreateState(categoryId, stateId, null, description, value, false, false);
     }
 
 
@@ -294,7 +299,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @Action(description = "Set output volume", format = "Set output volume of: {$outputMixerId$} to {$volumeValueString$}",
             categoryId = "WaveLinkOutputs", name="Set Output Volume")
     private void actionSetOutputVolume(@Data(valueChoices = {"Local", "Stream", "Both"})  String[] outputMixerId, @Data() String volumeValueString) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + outputMixerId[0] + " - " + volumeValueString);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetOutputVolume received: " + outputMixerId[0] + " - " + volumeValueString);
         Integer volumeValue = null;
         try {
             volumeValue = Integer.parseInt(volumeValueString);
@@ -500,12 +505,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (isLocalMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume", finalIntegerValue);
                 input.setLocalMixerLevel(finalIntegerValue);
-                WaveLinkPlugin.setInputValue(finalIntegerValue,"Local", input);
+                WaveLinkPlugin.setInputValue(finalIntegerValue,"Local", input, true);
             }
             if (isStreamMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", finalIntegerValue);
                 input.setStreamMixerLevel(finalIntegerValue);
-                WaveLinkPlugin.setInputValue(finalIntegerValue,"Stream",input);
+                WaveLinkPlugin.setInputValue(finalIntegerValue,"Stream",input, true);
             }
         });
     }
@@ -605,8 +610,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getLocalFilterBypassStateId().replace(" ", ""), input.getPluginBypassLocal());
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getStreamFilterBypassStateId().replace(" ", ""), input.getPluginBypassStream());
 
-            WaveLinkPlugin.setInputValue(input.getLocalMixerLevel(), "Local", input);
-            WaveLinkPlugin.setInputValue(input.getStreamMixerLevel(), "Stream", input);
+            WaveLinkPlugin.setInputValue(input.getLocalMixerLevel(), "Local", input, true);
+            WaveLinkPlugin.setInputValue(input.getStreamMixerLevel(), "Stream", input, true);
         });
         System.out.println("ending inputs UPDATE");
 
@@ -831,9 +836,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                                       @Data (valueChoices = {"Local", "Stream", "Both"}) String[] mixerId) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector inputVolumeConnector received: " + choices[0] + " - " + value + " - " + mixerId[0]);
         Status.allInputs.stream().filter(input -> isInput(input, choices[0])).forEach(input -> {
-            System.out.println("THIS IS PLUGIN ID - " + WaveLinkPluginConstants.ID );
-            System.out.println("THIS IS CONNECT ID - " + WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID );
-            System.out.println("THIS IS MIXER ID - " + WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.MixerId.ID);
 
 
             if (isLocalMixer(mixerId[0])) {
@@ -1088,7 +1090,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 //        } catch (InterruptedException e) {
 //            LOGGER.log(Level.WARNING, e.toString());
 //        }
-//        firstRun = false;
+        firstRun = false;
     }
     @Override
     public void onConnectedToWrongApp() {
@@ -1347,18 +1349,27 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             LOGGER.log(Level.WARNING, e.toString());
         }
     }
-    public static void setInputValue(int value, String mixerName, Input input) {
+    public static void setInputValue(int value, String mixerName, Input input, boolean updateConnector) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector.data.mixerId", mixerName);
         data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", input.getName());
-        try {
-            Thread.sleep(150);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            Thread.sleep(150);
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
 
-        ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID,value,data);
-        WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        if (waveLinkPlugin.firstRun) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID, value, data);
+            WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        } else {
+            WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID, value, data);
+        }
 
         //        if (mixerName.equals("Local"))com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector
 
@@ -1366,17 +1377,23 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkVolumeStates.state." + stateId,value);
     }
 
-    public static void setOutputValue(int value, String mixerName) {
+    public static void setOutputValue(int value, String mixerName, boolean updateConnector) {
         HashMap<String, Object> data = new HashMap<>();
         data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.connector.outputVolumeConnector.data.outputMixerId", mixerName);
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+
 //        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
-        ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
-        WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        if (waveLinkPlugin.firstRun) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID, value, data);
+            WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        } else {
+            WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
+
+        }
         if (mixerName.equals("Local")) {
             WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalVolume.ID, value);
         } else {
