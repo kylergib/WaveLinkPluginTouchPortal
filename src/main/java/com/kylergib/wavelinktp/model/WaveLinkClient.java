@@ -10,10 +10,12 @@ import org.json.JSONObject;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -24,16 +26,29 @@ public class WaveLinkClient extends WebSocketClient {
     private int port;
     private String host;
     private int configsReceived;
+    private boolean connectedToWaveLink;
 
-    private WaveLinkCallback configCallback;
-    private int realTimeUpdateCounter = 10;
+//    private final static Logger LOGGER = Logger.getLogger(WaveLinkClient.class.getName());
 
-    public WaveLinkClient(String ipAddress, int port) throws Exception {
+    private WaveLinkCallback waveLinkCallback;
+//    private int realTimeUpdateCounter = 10;
+    private long lastBroadcastSent = -4;
+    private WaveLink waveLink;
+
+//    public interface connectedToWaveLink {
+//        void onConnected();
+//        void onDisconnected();
+//        void connectedToDifferentApp();
+//    }
+
+    public WaveLinkClient(String ipAddress, int port, WaveLinkCallback waveLinkCallback) throws Exception {
         super(new URI("ws://" + ipAddress + ":" + port));
+        this.waveLinkCallback = waveLinkCallback;
+        this.connectedToWaveLink = false;
         this.port = port;
         this.host = ipAddress;
         this.configsReceived = 0;
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to: " + ipAddress + " using port: " + port);
+        WaveLinkPlugin.LOGGER.log(Level.FINER, "Trying to connect to: " + ipAddress + " using port: " + port);
         connect();
 
     }
@@ -42,13 +57,18 @@ public class WaveLinkClient extends WebSocketClient {
     public void onOpen(ServerHandshake handshakedata) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Connected to Wave Link on Port: " + port);
         WaveLinkPlugin.latch.countDown();
+        waveLink = new WaveLink();
+        WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+        send(getAppInfo.getJsonString());
     }
 
     //chooses what to do when client receives messages from wave link
     @Override
     public void onMessage(String message) {
         JSONObject newReceive = new JSONObject(message);
-//        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+//        LOGGER.log(Level.FINER, String.valueOf(newReceive));
+
+
         if (newReceive.keySet().contains("result") && newReceive.get("result").equals(null)) {
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "Result was null");
             WaveLinkPlugin.LOGGER.log(Level.WARNING, String.valueOf(newReceive));
@@ -57,12 +77,21 @@ public class WaveLinkClient extends WebSocketClient {
         }
         if (newReceive.keySet().contains("method") && newReceive.get("method").equals("realTimeChanges")) {
 
-            if (realTimeUpdateCounter > 0) {
-                realTimeUpdateCounter -= 1;
+//            if (realTimeUpdateCounter > 0) {
+//                realTimeUpdateCounter -= 1;
+//                return;
+//            } else {
+//                realTimeUpdateCounter = 10;
+//            }
+            if (WaveLinkPlugin.broadcastTimerInt == -1) {
+                WaveLinkPlugin.LOGGER.log(Level.FINER, "Broadcast timer is skipped because it is -1");
                 return;
-            } else {
-                realTimeUpdateCounter = 10;
             }
+            else if (lastBroadcastSent != -4 && (System.currentTimeMillis() - lastBroadcastSent)/1000 < WaveLinkPlugin.broadcastTimerInt) {
+                WaveLinkPlugin.LOGGER.log(Level.FINER, "Broadcast timer is skipped because timer has not been initialized or greater than timer integer.");
+                return;
+            }
+
             JSONObject params = (JSONObject) newReceive.get("params");
             JSONArray mixerList = (JSONArray) params.get("MixerList");
             mixerList.forEach(mixerInput -> {
@@ -96,6 +125,7 @@ public class WaveLinkClient extends WebSocketClient {
 //                                    input.getLevelLeft() + " - Right: " + input.getLevelRight());
                             WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkLevelStates.state." + input.getLevelLeftStateId().replace(" ",""),input.getLevelLeft());
                             WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkLevelStates.state." + input.getLevelRightStateId().replace(" ",""),input.getLevelRight());
+                            lastBroadcastSent = System.currentTimeMillis();
                         }
 
                     }
@@ -143,53 +173,86 @@ public class WaveLinkClient extends WebSocketClient {
             if (localLevelChanged) {
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalLeftLevel.ID,Status.localLeft);
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalRightLevel.ID,Status.localRight);
-                System.out.println(Status.localLeft);
+//                System.out.println(Status.localLeft);
             }
             if (streamLevelChanged) {
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamLeftLevel.ID,Status.streamLeft);
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamRightLevel.ID,Status.streamRight);
             }
 
-        } else {
-            WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
         }
 
 
 
         if (newReceive.keySet().contains("id")) {
+            WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+//            System.out.println(String.valueOf(newReceive));
+//            System.out.println();
             //id in message matches what the client sent from WaveLinkPlugin class
             if ((int) newReceive.get("id") == 11) {
-                Status.applicationInfo = new JSONObject(message);
+                // need to check what appName is, if it is "Elgato Wave Link" continue, if not need to close
+                JSONObject result = newReceive.getJSONObject("result");
+                if (!result.get("appName").equals("Elgato Wave Link")) {
+                    WaveLinkPlugin.LOGGER.log(Level.WARNING, "Connected to wrong app. Will try another port");
+                    waveLinkCallback.onConnectedToWrongApp();
+                }
+                if (!connectedToWaveLink) {
+                    waveLinkCallback.onConnectedToWaveLink();
+                    connectedToWaveLink = true;
+                }
+
+//                Status.applicationInfo = newReceive; //removed, unnecessary
                 configsReceived = configsReceived + 1;
+                // new
+
+
+
 
             } else if ((int) newReceive.get("id") == 12) {
-                Status.microphoneConfig = new JSONObject(message);
+                Status.microphoneConfig = newReceive;
                 Status.getMicrophone();
                 configsReceived = configsReceived + 1;
+
+                //new
+                waveLink.onMicrophoneConfig(newReceive);
             } else if ((int) newReceive.get("id") == 13) {
-                Status.switchState = new JSONObject(message);
+                //TODO: finish
+                Status.switchState = newReceive;
+
                 Status.getSwitchState();
                 configsReceived = configsReceived + 1;
             } else if ((int) newReceive.get("id") == 14) {
-                Status.outputConfig = new JSONObject(message);
+                Status.outputConfig = newReceive;
+
                 Status.getOutputConfig();
                 configsReceived = configsReceived + 1;
+                //new
+                waveLink.onOutputConfig(newReceive);
+
             } else if ((int) newReceive.get("id") == 15) {
-                Status.outputs = new JSONObject(message);
+                Status.outputs = newReceive;
+                WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+
                 Status.getOutputs();
                 configsReceived = configsReceived + 1;
+
+                //new
+                waveLink.onOutputs(newReceive);
             } else if ((int) newReceive.get("id") == 16) {
                 Status.inputConfigs =
-                        new JSONObject(message);
+                        newReceive;
+                WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(newReceive));
+
                 Status.getInput();
                 configsReceived = configsReceived + 1;
 
-
+                // new
+                waveLink.onInputConfig(newReceive);
 
 
             }
-            if (configsReceived == 6) {
-                configCallback.onConfigsReceived();
+            if (configsReceived == 5) {
+                waveLinkCallback.onConfigsReceived();
                 configsReceived = 0;
             }
 
@@ -232,10 +295,10 @@ public class WaveLinkClient extends WebSocketClient {
                     if (input.getIdentifier().equals(inputIdentifier)) {
                         if (mixerId.equals(Status.localPackageName) && input.getLocalMixerLevel() != value) {
                             input.setLocalMixerLevel(value);
-                            Status.setInputValue(value,"Local", input);
+                            WaveLinkPlugin.setInputValue(value,"Local", input, true);
                         } else if (mixerId.equals(Status.streamPackageName)) {
                             input.setStreamMixerLevel(value);
-                            Status.setInputValue(value,"Stream", input);
+                            WaveLinkPlugin.setInputValue(value,"Stream", input, true);
                         }
 
                     }
@@ -277,7 +340,7 @@ public class WaveLinkClient extends WebSocketClient {
                 for (SwitchState switchState : Status.switchStates) {
                     if (switchState.getMixerId().equals(mixerId)) {
                         switchState.setLevel(value);
-                        Status.setOutputValue(value, switchState.getMixerName());
+                        WaveLinkPlugin.setOutputValue(value, switchState.getMixerName(), true);
                     }
                 }
 
@@ -428,19 +491,24 @@ public class WaveLinkClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "WebSocket connection closed: " + reason);
+        WaveLinkPlugin.LOGGER.log(Level.FINER, "WebSocket connection closed: " + reason);
         WaveLinkPlugin.latch.countDown();
+        if (connectedToWaveLink) {
+            waveLinkCallback.onWaveLinkDisconnected();
+        }
     }
 
     @Override
     public void onError(Exception ex) {
-        WaveLinkPlugin.LOGGER.log(Level.SEVERE, String.valueOf(ex.fillInStackTrace()));
+        WaveLinkPlugin.LOGGER.log(Level.FINER, String.valueOf(ex.fillInStackTrace()));
 
     }
 
-    public void setConfigCallback(WaveLinkCallback configCallback) {
-        this.configCallback = configCallback;
+    public void setConfigCallback(WaveLinkCallback waveLinkCallback) {
+        this.waveLinkCallback = waveLinkCallback;
     }
+
+
 
 
 
