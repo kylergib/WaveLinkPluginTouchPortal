@@ -1,6 +1,13 @@
 # WaveLinkPluginTouchPortal
 Wave Link Touch Portal Plugin
 
+## Latest Release changes:
+- Adds a broadcast timer, so that wave link will not overload touch portal with changes to the decibel levels. This can be set to -1 to disable completely if you do not want to use it. Default is 5, so it will only update the decibel states every 6 seconds, but you can change it to what you wish.
+
+- updates how the plugin detects if wave link is open or not, so i have removed the monitor open setting and it should work better now.
+
+- I noticed that the pc/mic mix action is not working properly and I am still trying to figure out why that isn’t working. I never use that action so unsure if it works on older versions of the plugin either, still need to investigate further for a fix
+
 ### This is Wave Link Example.tpz in releases
 ![IMG_0031](https://user-images.githubusercontent.com/48994502/226190178-9b502275-4cf4-42e0-a71e-fb969b4e5ad3.jpeg)
 
