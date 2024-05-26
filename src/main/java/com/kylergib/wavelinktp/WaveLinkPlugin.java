@@ -3,6 +3,7 @@ package com.kylergib.wavelinktp;
 
 import com.christophecvb.touchportal.TouchPortalPlugin;
 import com.christophecvb.touchportal.annotations.*;
+import com.christophecvb.touchportal.helpers.ConnectorHelper;
 import com.christophecvb.touchportal.helpers.PluginHelper;
 import com.christophecvb.touchportal.helpers.ReceivedMessageHelper;
 import com.christophecvb.touchportal.model.*;
@@ -21,8 +22,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.ConsoleHandler;
@@ -33,48 +33,88 @@ import static java.util.logging.Level.FINEST;
 
 
 @Plugin(version = BuildConfig.VERSION_CODE, colorDark = "#203060", colorLight = "#4070F0", name = "Wave Link Plugin")
-public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener,
-        MonitorAppThread.AppOpenCallback, WaveLinkCallback {
+public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlugin.TouchPortalPluginListener, WaveLinkCallback, HandlerCallback {
+
+
     public static CountDownLatch latch = new CountDownLatch(1);
     public static WaveLinkClient client;
     public static WaveLinkPlugin waveLinkPlugin;
     public final static Logger LOGGER = Logger.getLogger(TouchPortalPlugin.class.getName());
     private String currentIp;
     private Boolean firstRun;
-    private static boolean appIsOpen;
-    private MonitorAppThread monitorAppThread;
+//    private static boolean appIsOpen;
+    private int port;
+    private final ApiHandler apiHandler = new ApiHandler(100,this);
 
     @Override
-    public void onAppOpened() {
-        LOGGER.log(Level.INFO, "Wave Link opened");
-        appIsOpen = true;
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            LOGGER.log(Level.WARNING, e.toString());
-        }
-        try {
-            if (currentIp.equals("localhost") || currentIp.equals("127.0.0.1")) {
-                connectToWaveLink();
-                int retry = 0;
-                while (!client.isOpen()) {
-
-                    connectToWaveLink();
-                    if (retry > 3) break;
-                    retry += 1;
-                }
-            }
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, e.toString());
-        }
+    public void onStateCreate(StateCreateInfo update) {
+        this.sendCreateState(update.getCategoryId(), update.getStateId(), null, update.getDescription(), update.getValue(), false, false);
+    }
+    @Override
+    public void onStateUpdate(StateUpdateInfo update){
+        this.sendStateUpdate(update.getStateId(), update.getValue(), false, false);
+    }
+    @Override
+    public void onConnectorUpdate(ConnectorUpdateInfo update){
+        sendConnectorUpdate(update.getPluginId(), update.getConnectorId(), update.getValue(), update.getData());
     }
 
     @Override
-    public void onAppClosed() {
-        LOGGER.log(Level.WARNING, "Wave Link closed");
-        appIsOpen = false;
-        if (client.isOpen()) client.close();
+    public boolean sendStateUpdate(String stateId, Object value) {
+        if (firstRun) {
+            apiHandler.addStateUpdate(new StateUpdateInfo(stateId, value));
+            return true;
+        }
+
+        return this.sendStateUpdate(stateId, value, false, false);
     }
+    @Override
+    public boolean sendCreateState(String categoryId, String stateId, String description, Object value) {
+        if (firstRun) {
+            apiHandler.addStateCreate(new StateCreateInfo(categoryId, stateId, description, value));
+            return true;
+        }
+        return this.sendCreateState(categoryId, stateId, null, description, value, false, false);
+    }
+
+
+//    @Override
+//    public boolean sendConnectorUpdate(String pluginId, String connectorId, Integer value, Map<String, Object> data) {
+//        return this.sendConnectorUpdate(ConnectorHelper.getConstructedId(pluginId, connectorId, value, data), value);
+//    }
+//    private MonitorAppThread monitorAppThread;
+
+//    @Override
+//    public void onAppOpened() {
+//        LOGGER.log(Level.INFO, "Wave Link opened");
+//        appIsOpen = true;
+//        try {
+//            Thread.sleep(500);
+//        } catch (InterruptedException e) {
+//            LOGGER.log(Level.WARNING, e.toString());
+//        }
+//        try {
+//            if (currentIp.equals("localhost") || currentIp.equals("127.0.0.1")) {
+//                connectToWaveLink();
+//                int retry = 0;
+//                while (!client.isOpen()) {
+//
+//                    connectToWaveLink();
+//                    if (retry > 3) break;
+//                    retry += 1;
+//                }
+//            }
+//        } catch (Exception e) {
+//            LOGGER.log(Level.WARNING, e.toString());
+//        }
+//    }
+
+//    @Override
+//    public void onAppClosed() {
+//        LOGGER.log(Level.WARNING, "Wave Link closed");
+//        appIsOpen = false;
+//        if (client.isOpen()) client.close();
+//    }
 
 
     private enum Categories {
@@ -98,16 +138,17 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     private static String ipSetting;
 
     /**
+     * Timer to receive broadcasts from wavelink. -1 means broadcast won't go through
+     */
+    @Setting(name = "Broadcast Timer", defaultValue = "5", maxLength = 15)
+    public static String broadcastTimer;
+    public static int broadcastTimerInt = 5;
+
+    /**
      * Debug setting in touch portal
      */
     @Setting(name = "Debug", defaultValue = "1", maxLength = 15)
     public static int debugSetting;
-
-    /**
-     * Monitor Wave link app in touch portal. 1 is true, 0 if false
-     */
-    @Setting(name = "Monitor Wave Link App", defaultValue = "1", maxLength = 15)
-    public static int monitorWaveLinkApp;
 
 
 
@@ -131,58 +172,64 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
 
-    @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
-    private void connectToWaveLink() throws Exception {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Trying to connect to IP: " + ipSetting);
+//    @Action(description = "Connect/Reconnect to Wave Link", categoryId = "WaveLinkOutputs", name="Connect/Reconnect to Wave Link")
+    private void connectToWaveLink(int port) throws Exception {
+        WaveLinkPlugin.LOGGER.log(Level.FINER, "Trying to connect to IP: " + ipSetting + " on port: " + port);
         //start port at 1824, if wave link is not on 1824 it will connect to the next point and then stop at 1835.
         firstRun = true;
-        int port = 1824;
+//        port = 1824;
 
-        client = new WaveLinkClient(ipSetting, port);
-        while (true) {
-            latch.await();
-            Thread.sleep(100); //need to sleep, or it will try to connect to the next port too quickly
-            if (!client.isOpen()) {
-
-                if (port < 1829) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
-
-                    client = new WaveLinkClient(ipSetting, port);
-                    port = port + 1;
-                    latch = new CountDownLatch(1);
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-        if (client.isOpen()) {
-            client.setConfigCallback(this);
-            WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
-            SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
-            SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
-            Status.switchStates.add(localSwitch);
-            Status.switchStates.add(streamSwitch);
-            Status.switchMap.put("localMixer", Status.localPackageName);
-            Status.switchMap.put("streamMixer", Status.streamPackageName);
+        client = new WaveLinkClient(ipSetting, port, this);
+        Thread.sleep(100);
+//        if (client.isOpen()) {
+//            LOGGER.log(Level.INFO, "Connected to wave link? " + port);
+//            client.setConfigCallback(this);
+//        }
+//        client.connect();
+//        while (true) {
+//            latch.await();
+//            Thread.sleep(100); //need to sleep, or it will try to connect to the next port too quickly
+//            if (!client.isOpen()) {
+//
+//                if (port < 1829) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
+//
+//                    client = new WaveLinkClient(ipSetting, port);
+//                    port = port + 1;
+//                    latch = new CountDownLatch(1);
+//                } else {
+//                    break;
+//                }
+//            } else {
+//                break;
+//            }
+//        }
+//        if (client.isOpen()) {
+//            client.setConfigCallback(this);
+//            WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
+//            SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
+//            SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
+//            Status.switchStates.add(localSwitch);
+//            Status.switchStates.add(streamSwitch);
+//            Status.switchMap.put("localMixer", Status.localPackageName);
+//            Status.switchMap.put("streamMixer", Status.streamPackageName);
 
             //sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
-            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
-            client.send(getAppInfo.getJsonString());
-            WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
-            client.send(getMicrophoneConfig.getJsonString());
-            WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
-            client.send(getSwitchState.getJsonString());
-            WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
-            client.send(getOutputConfig.getJsonString());
-            WaveJson getOutputs = new WaveJson("getOutputs", 15);
-            client.send(getOutputs.getJsonString());
-            WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
-            client.send(getInputConfigs.getJsonString());
-
-            // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
-            WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
-        }
+//            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//            client.send(getAppInfo.getJsonString());
+//            WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
+//            client.send(getMicrophoneConfig.getJsonString());
+//            WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
+//            client.send(getSwitchState.getJsonString());
+//            WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
+//            client.send(getOutputConfig.getJsonString());
+//            WaveJson getOutputs = new WaveJson("getOutputs", 15);
+//            client.send(getOutputs.getJsonString());
+//            WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
+//            client.send(getInputConfigs.getJsonString());
+//
+//            // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
+//            WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
+//        }
 
     }
 
@@ -252,7 +299,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     @Action(description = "Set output volume", format = "Set output volume of: {$outputMixerId$} to {$volumeValueString$}",
             categoryId = "WaveLinkOutputs", name="Set Output Volume")
     private void actionSetOutputVolume(@Data(valueChoices = {"Local", "Stream", "Both"})  String[] outputMixerId, @Data() String volumeValueString) {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetInputVolume received: " + outputMixerId[0] + " - " + volumeValueString);
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetOutputVolume received: " + outputMixerId[0] + " - " + volumeValueString);
         Integer volumeValue = null;
         try {
             volumeValue = Integer.parseInt(volumeValueString);
@@ -458,12 +505,12 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             if (isLocalMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(),Status.localPackageName,"Volume", finalIntegerValue);
                 input.setLocalMixerLevel(finalIntegerValue);
-                Status.setInputValue(finalIntegerValue,"Local", input);
+                WaveLinkPlugin.setInputValue(finalIntegerValue,"Local", input, true);
             }
             if (isStreamMixer(mixerId[0])) {
                 WaveLinkActions.setInputConfig(input.getIdentifier(), Status.streamPackageName, "Volume", finalIntegerValue);
                 input.setStreamMixerLevel(finalIntegerValue);
-                Status.setInputValue(finalIntegerValue,"Stream",input);
+                WaveLinkPlugin.setInputValue(finalIntegerValue,"Stream",input, true);
             }
         });
     }
@@ -483,6 +530,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         updateOutputs();
         updateInputValues();
     }
+
+
 
     public void updateInputs() throws InterruptedException {
         if (!firstRun) {
@@ -536,6 +585,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
         waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
                 .WaveLinkInputs.States.InputList.ID, allInputsString);
+        updateInputValues();
 
     }
 
@@ -560,8 +610,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getLocalFilterBypassStateId().replace(" ", ""), input.getPluginBypassLocal());
             waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + input.getStreamFilterBypassStateId().replace(" ", ""), input.getPluginBypassStream());
 
-            Status.setInputValue(input.getLocalMixerLevel(), "Local", input);
-            Status.setInputValue(input.getStreamMixerLevel(), "Stream", input);
+            WaveLinkPlugin.setInputValue(input.getLocalMixerLevel(), "Local", input, true);
+            WaveLinkPlugin.setInputValue(input.getStreamMixerLevel(), "Stream", input, true);
         });
         System.out.println("ending inputs UPDATE");
 
@@ -629,10 +679,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneGain value could not be converted to number");
             return;
         }
-        if (value < 0 || value > 40) {
-            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneGain value has to be between 0 and 40. It was " + value);
-            return;
-        }
+//        if (value < 0 || value > 40) {
+//            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneGain value has to be between 0 and 40. It was " + value);
+//            return;
+//        }
 
 
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetMicrophone received: " + " - " + choices[0] + " - " + valueString + " - " + options[0]);
@@ -652,10 +702,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneOutputVolume value could not be converted to number");
             return;
         }
-        if (value < 0 || value > 40) {
-            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneOutputVolume value has to be between 0 and 40. It was " + value);
-            return;
-        }
+//        if (value < 0 || value > 40) {
+//            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicrophoneOutputVolume value has to be between 0 and 40. It was " + value);
+//            return;
+//        }
 
 
         WaveLinkActions.setMicOutputEnhancement("outputVolume",choices[0],options[0],value);
@@ -675,10 +725,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicPcMix value could not be converted to number");
             return;
         }
-        if (value < 0 || value > 40) {
-            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicPcMix value has to be between 0 and 40. It was " + value);
-            return;
-        }
+//        if (value < 0 || value > 40) {
+//            WaveLinkPlugin.LOGGER.log(Level.WARNING, "actionSetMicPcMix value has to be between 0 and 40. It was " + value);
+//            return;
+//        }
 
         WaveLinkActions.setMicOutputEnhancement("balance",choices[0],options[0],value);
     }
@@ -786,9 +836,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                                       @Data (valueChoices = {"Local", "Stream", "Both"}) String[] mixerId) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Connector inputVolumeConnector received: " + choices[0] + " - " + value + " - " + mixerId[0]);
         Status.allInputs.stream().filter(input -> isInput(input, choices[0])).forEach(input -> {
-            System.out.println("THIS IS PLUGIN ID - " + WaveLinkPluginConstants.ID );
-            System.out.println("THIS IS CONNECT ID - " + WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID );
-            System.out.println("THIS IS MIXER ID - " + WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.MixerId.ID);
 
 
             if (isLocalMixer(mixerId[0])) {
@@ -836,7 +883,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         // Socket connection is lost or plugin has received close message
         client.close();
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Disconnected");
-        monitorAppThread.requestStop();
+//        monitorAppThread.requestStop();
         System.exit(0);
     }
 
@@ -864,9 +911,33 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     public void onInfo(TPInfoMessage tpInfoMessage) {
         currentIp = ipSetting;
+        broadcastTimerInt = Integer.parseInt(broadcastTimer);
         setLogLevel();
         boolean updateAvailable = checkForUpdate();
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
+
+//        port = 1824;
+//        try {
+//            connectToWaveLink(port);
+//            Thread.sleep(100);
+//            LOGGER.log(Level.FINER, String.valueOf(client.isOpen()));
+//            while (client != null && !client.isOpen()) {
+//                port++;
+//                connectToWaveLink(port);
+//
+//                if (port > 1829) port = 1823;
+//                Thread.sleep(100);
+//            }
+////            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+////            client.send(getAppInfo.getJsonString());
+//
+////            if () {
+////                connectToWaveLink(port++);
+////            }
+//        } catch (Exception e) {
+//            LOGGER.log(Level.WARNING, e.toString());
+//        }
+
+//        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
         if (updateAvailable) {
             waveLinkPlugin.sendShowNotification(
                     WaveLinkPluginConstants.WaveLinkInputs.ID + ".updateNotification",
@@ -878,18 +949,17 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         }
-        if (monitorAppThread == null && monitorWaveLinkApp == 1 && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
-            monitorAppThread = new MonitorAppThread(this);
-            monitorAppThread.start();
-
-
-        } else {
-            try {
-                connectToWaveLink();
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e.toString());
-            }
-        }
+        startClient();
+//        if (monitorAppThread == null && monitorWaveLinkApp == 1 && (ipSetting.equals("localhost") || ipSetting.equals("127.0.0.1"))) {
+//            monitorAppThread = new MonitorAppThread(this);
+//            monitorAppThread.start();
+//        } else {
+//            try {
+//                connectToWaveLink();
+//            } catch (Exception e) {
+//                LOGGER.log(Level.WARNING, e.toString());
+//            }
+//        }
 
     }
 
@@ -930,10 +1000,10 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void onSettings(TPSettingsMessage tpSettingsMessage) {
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Plugin Settings Changed");
         setLogLevel();
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "monitorWaveLinkApp is " + String.valueOf(monitorWaveLinkApp));
+        broadcastTimerInt = Integer.parseInt(broadcastTimer);
         if (!currentIp.equals(ipSetting)) {
             currentIp = ipSetting;
-            boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
+//            boolean monitorActive = (monitorAppThread != null && monitorAppThread.isAlive());
             boolean isLocalhost = (currentIp.equals("localhost") || currentIp.equals("127.0.0.1"));
 
             if (client.isOpen()) {
@@ -941,35 +1011,36 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 WaveLinkPlugin.LOGGER.log(Level.INFO, "Closed previous connection to Wave Link");
                 try {
                     Thread.sleep(100);
+                    startClient();
                 } catch (InterruptedException e) {
                     LOGGER.log(Level.WARNING, e.toString());
                 }
             }
 
-            if (monitorActive && !isLocalhost) {
-                monitorAppThread.requestStop();
-                LOGGER.log(Level.INFO, "requested monitor to stop");
-            } else if (isLocalhost && !monitorActive && monitorWaveLinkApp == 1) {
-                monitorAppThread = new MonitorAppThread(this);
-                monitorAppThread.start();
-                LOGGER.log(Level.INFO, "requested monitor to start");
-//                return;
+//            if (monitorActive && !isLocalhost) {
+//                monitorAppThread.requestStop();
+//                LOGGER.log(Level.INFO, "requested monitor to stop");
+//            } else if (isLocalhost && !monitorActive && monitorWaveLinkApp == 1) {
+//                monitorAppThread = new MonitorAppThread(this);
+//                monitorAppThread.start();
+//                LOGGER.log(Level.INFO, "requested monitor to start");
+////                return;
+//
+//            } else if (isLocalhost && monitorActive && monitorWaveLinkApp == 0){ //monitor is now false, but thread is alive
+//                monitorAppThread.requestStop();
+//            }
 
-            } else if (isLocalhost && monitorActive && monitorWaveLinkApp == 0){ //monitor is now false, but thread is alive
-                monitorAppThread.requestStop();
-            }
-
-            try {
-                int retry = 0;
-                while (!client.isOpen()) {
-
-                    connectToWaveLink();
-                    if (retry > 3) break;
-                    retry += 1;
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e.toString());
-            }
+//            try {
+//                int retry = 0;
+//                while (!client.isOpen()) {
+//
+//                    connectToWaveLink(port);
+//                    if (retry > 3) break;
+//                    retry += 1;
+//                }
+//            } catch (Exception e) {
+//                LOGGER.log(Level.WARNING, e.toString());
+//            }
         }
     }
 
@@ -1013,13 +1084,63 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
      */
     @Override
     public void onConfigsReceived() {
-        WaveLinkPlugin.LOGGER.log(Level.INFO, "Received all Wave Link configs");
-        try {
-            waveLinkPlugin.actionUpdatePuts();
-        } catch (InterruptedException e) {
-            LOGGER.log(Level.WARNING, e.toString());
-        }
+        LOGGER.log(Level.INFO, "Received all Wave Link configs");
+//        try {
+//            waveLinkPlugin.actionUpdatePuts();
+//        } catch (InterruptedException e) {
+//            LOGGER.log(Level.WARNING, e.toString());
+//        }
         firstRun = false;
+    }
+    @Override
+    public void onConnectedToWrongApp() {
+        LOGGER.log(Level.WARNING, "Connected to wrong app");
+        client.close();
+//        if (port > 1828) { //stopping at 29 because i do not believe it goes past there and el gato uses 1834 for camera hub, so just trying to prevent errors.
+//            port = 1823;
+//        }
+        try {
+//            port++;
+            connectToWaveLink(port);
+//            client = new WaveLinkClient(ipSetting, port);
+//            port = port + 1;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+    @Override
+    public void onConnectedToWaveLink() {
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Getting Config from Wave Link");
+        SwitchState localSwitch = new SwitchState(Status.localPackageName, null, -1, "Local");
+        SwitchState streamSwitch = new SwitchState(Status.streamPackageName, null, -1, "Stream");
+        Status.switchStates.add(localSwitch);
+        Status.switchStates.add(streamSwitch);
+        Status.switchMap.put("localMixer", Status.localPackageName);
+        Status.switchMap.put("streamMixer", Status.streamPackageName);
+//
+//    sends commands to wave link to receive wave link configs (inputs/outputs, selected output, filters, etc)
+//        WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//        client.send(getAppInfo.getJsonString());
+        WaveJson getMicrophoneConfig = new WaveJson("getMicrophoneConfig", 12);
+        client.send(getMicrophoneConfig.getJsonString());
+        WaveJson getSwitchState = new WaveJson("getSwitchState", 13);
+        client.send(getSwitchState.getJsonString());
+        WaveJson getOutputConfig = new WaveJson("getOutputConfig", 14);
+        client.send(getOutputConfig.getJsonString());
+        WaveJson getOutputs = new WaveJson("getOutputs", 15);
+        client.send(getOutputs.getJsonString());
+        WaveJson getInputConfigs = new WaveJson("getInputConfigs", 16);
+        client.send(getInputConfigs.getJsonString());
+
+        // makes sure that the plugin received all 6 of the configs before going further, so no errors occur.
+        WaveLinkPlugin.LOGGER.log(Level.INFO, "Waiting on all Wave Link configs");
+    }
+
+    @Override
+    public void onWaveLinkDisconnected() {
+        startClient();
+
     }
     public void setLogLevel() {
 //        debugSetting = 4;
@@ -1117,7 +1238,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
     public boolean checkForUpdate() {
-        //TODO: replace with right info after commit
+
         String repositoryOwner = "kylergib";
         String repositoryName = "WaveLinkPluginTouchPortal";
 
@@ -1202,5 +1323,82 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         LOGGER.log(Level.FINER, "Sent states for input: " + input.getName());
 
 
+    }
+
+    public void startClient() {
+        apiHandler.clearQueue();
+        LOGGER.log(Level.INFO, "Waiting to connect to Wave Link");
+        port = 1824;
+        try {
+            connectToWaveLink(port);
+            Thread.sleep(200);
+            while (client != null && !client.isOpen()) {
+                port++;
+                connectToWaveLink(port);
+
+                if (port > 1829) port = 1823;
+                Thread.sleep(200);
+            }
+//            WaveJson getAppInfo = new WaveJson("getApplicationInfo", 11);
+//            client.send(getAppInfo.getJsonString());
+
+//            if () {
+//                connectToWaveLink(port++);
+//            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, e.toString());
+        }
+    }
+    public static void setInputValue(int value, String mixerName, Input input, boolean updateConnector) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector.data.mixerId", mixerName);
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.state.inputList", input.getName());
+//        try {
+//            Thread.sleep(150);
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
+
+        if (waveLinkPlugin.firstRun) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID, value, data);
+            WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        } else {
+            WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkInputs.Connectors.InputVolumeConnector.ID, value, data);
+        }
+
+        //        if (mixerName.equals("Local"))com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkInputs.connector.inputVolumeConnector
+
+        String stateId = (mixerName.equals("Local")) ? input.getLocalVolumeStateId().replace(" ","") : input.getStreamVolumeStateId().replace(" ","");
+        WaveLinkPlugin.waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkVolumeStates.state." + stateId,value);
+    }
+
+    public static void setOutputValue(int value, String mixerName, boolean updateConnector) {
+        HashMap<String, Object> data = new HashMap<>();
+        data.put("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkOutputs.connector.outputVolumeConnector.data.outputMixerId", mixerName);
+
+//        WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
+        if (waveLinkPlugin.firstRun) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            ConnectorUpdateInfo info = new ConnectorUpdateInfo(WaveLinkPluginConstants.ID, WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID, value, data);
+            WaveLinkPlugin.waveLinkPlugin.apiHandler.addConnectorUpdate(info);
+        } else {
+            WaveLinkPlugin.waveLinkPlugin.sendConnectorUpdate(WaveLinkPluginConstants.ID,WaveLinkPluginConstants.WaveLinkOutputs.Connectors.OutputVolumeConnector.ID,value,data);
+
+        }
+        if (mixerName.equals("Local")) {
+            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.LocalVolume.ID, value);
+        } else {
+            WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamVolume.ID, value);
+        }
+        System.out.println("finisdhed");
     }
 }
