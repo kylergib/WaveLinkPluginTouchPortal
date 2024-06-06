@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Base64;
+import java.util.List;
+
 /**
  * Current status for things inside of wave link
  */
@@ -120,11 +122,16 @@ public abstract class Status {
 
     public static void getInput() {
         //TODO: possible to get icon data and import icon?
+//        List<String> allInputsStringList = new ArrayList<>();
+
+
         if (!allInputs.isEmpty()) {
             allInputs.clear();
         }
         int id = (int) inputConfigs.get("id");
         JSONArray resultJson = (JSONArray) inputConfigs.get("result");
+        int numIndex = 0;
+        String[] allInputsStringList = new String[resultJson.length()];
         for (int i = 0; i < resultJson.length(); i++) {
             JSONObject tempJson = (JSONObject) resultJson.get(i);
 
@@ -205,6 +212,8 @@ public abstract class Status {
             newInput.setLevelRightStateId(newInput.getName() + " Level Right");
             newInput.setLocalVolumeStateId(newInput.getName() + " Local Volume");
             newInput.setStreamVolumeStateId(newInput.getName() + " Stream Volume");
+            allInputsStringList[numIndex] = newInput.getName();
+            numIndex = numIndex + 1;
 //            setInputValue(streamMixerLevel, "Stream", newInput);
 //            setInputValue(localMixerLevel, "Local", newInput);
 
@@ -219,7 +228,8 @@ public abstract class Status {
             if (!allInputs.isEmpty()) {
                 Boolean shouldAdd = true;
                 for (Input allInput : allInputs) {
-
+//                    allInputsStringList[numIndex] = allInput.getName();
+//                    numIndex = numIndex + 1;
                     if (allInput.getIdentifier().equals(newInput.getIdentifier())) {
                         shouldAdd = false;
                         break;
@@ -233,15 +243,22 @@ public abstract class Status {
                 }
             }
             else {
+
+//                numIndex = numIndex + 1;
                 allInputs.add(newInput);
                 WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
             }
         }
-        try {
-            WaveLinkPlugin.waveLinkPlugin.updateInputs();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+//        WaveLinkPlugin.waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+//                .WaveLinkInputs.States.InputList.ID, allInputsString);
+        WaveLinkPlugin.waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
+                .WaveLinkInputs.States.InputList.ID, allInputsStringList);
+        System.out.println("finished get input");
+//        try {
+//            WaveLinkPlugin.waveLinkPlugin.updateInputs();
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
 
     }
 

@@ -22,10 +22,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -421,7 +423,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                 input.setStreamMixerMuted(newValueStream);
                 String streamMuteStateId = "com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkMuteStates.state." + input.getStreamMuteStateId().replace(" ","");
                 waveLinkPlugin.sendStateUpdate(streamMuteStateId, mutedValue);
-                System.out.println(streamMuteStateId + " - " + mutedValue);
+//                System.out.println(streamMuteStateId + " - " + mutedValue);
 
             }
         });
@@ -454,8 +456,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     } else {
                         newValue = Boolean.valueOf(value[0]);
                     }
-                    System.out.println(String.format("%s", inputPlugin.getName(), inputPlugin.getIsActive()));
-                    System.out.println(String.format("%s", input.getName()));
+//                    System.out.println(String.format("%s", inputPlugin.getName(), inputPlugin.getIsActive()));
+//                    System.out.println(String.format("%s", input.getName()));
 
                     String stateId = input.getName().replace(" ","") + "Filter" + inputPlugin.getName();
                     String stateIdValue;
@@ -468,7 +470,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                     inputPlugin.setIsActive(newValue);
                     WaveLinkActions.setInputFilter(input.getIdentifier(),inputPlugin.getFilterID(),newValue);
                     waveLinkPlugin.sendStateUpdate("com.kylergib.wavelinktp.WaveLinkPlugin.WaveLinkFilterStates.state." + stateId,stateIdValue);
-                    System.out.println(stateId + " - " + stateIdValue);
+//                    System.out.println(stateId + " - " + stateIdValue);
 
                 });
 
@@ -590,7 +592,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     }
 
     public void updateInputValues() {
-        System.out.println("STARTING input UPDATE");
+//        System.out.println("STARTING input UPDATE");
         Status.allInputs.forEach(input -> {
 
             String localMutedValue = "unmuted";
@@ -613,11 +615,11 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             WaveLinkPlugin.setInputValue(input.getLocalMixerLevel(), "Local", input, true);
             WaveLinkPlugin.setInputValue(input.getStreamMixerLevel(), "Stream", input, true);
         });
-        System.out.println("ending inputs UPDATE");
+//        System.out.println("ending inputs UPDATE");
 
     }
     public void updateOutputs() {
-        System.out.println("STARTING OUTPUTS UPDATE");
+//        System.out.println("STARTING OUTPUTS UPDATE");
         if (!firstRun) {
             Status.allOutputs.clear();
             Status.getOutputs();
@@ -645,7 +647,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
             }
         }
         waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.OutputList.ID, allOutputsString);
-        System.out.println("ending OUTPUTS UPDATE");
+//        System.out.println("ending OUTPUTS UPDATE");
     }
 
     public void updateMics() {
@@ -1143,7 +1145,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
     }
     public void setLogLevel() {
-//        debugSetting = 4;
+        debugSetting = 3;
         LOGGER.log(Level.INFO, "Log level is: " + debugSetting);
         ConsoleHandler consoleHandler = (ConsoleHandler) Arrays.stream(LOGGER.getHandlers()).findFirst().get();
         Level newLevel;
@@ -1168,26 +1170,26 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         }
         if (debugSetting > 3) {
             try {
-                System.out.println("1");
+//                System.out.println("1");
                 File folder = new File(".");
 
                 if (folder.exists() && folder.isDirectory()) {
-                    System.out.println("2");
+//                    System.out.println("2");
                     File[] files = folder.listFiles();
                     int numLogs = 0;
                     if (files != null) {
-                        System.out.println("3");
+//                        System.out.println("3");
                         LocalDateTime oldestFileDate = null;
                         File oldestFile = null;
 
                         for (File file : files) {
-                            System.out.println("4");
+//                            System.out.println("4");
                             if (file.isFile()) {
-                                System.out.println("5");
+//                                System.out.println("5");
                                 //
                                 String filename = file.getName();
                                 if (filename.length() > 4 && filename.substring(filename.length() - 4).equals(".log")) {
-                                    System.out.println("6");
+//                                    System.out.println("6");
                                     LocalDateTime fileDate = LocalDateTime.parse(filename.substring(7,filename.length() - 4));
                                     if (oldestFile == null) oldestFile = file;
                                     if (oldestFileDate == null) oldestFileDate = fileDate;
@@ -1201,22 +1203,27 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
                             }
                         }
                         if (oldestFile != null && numLogs > 4) {
-                            System.out.println("7");
+//                            System.out.println("7");
                             oldestFile.delete();
                             LOGGER.log(FINEST, String.format("Deleted log file: %s", oldestFile.getName()));
                         }
-                        System.out.println("8");
+//                        System.out.println("8");
                     }
                 }
 //                System.out.println("9");
-//                LocalDateTime date = LocalDateTime.now();
+                LocalDateTime date = LocalDateTime.now();
 //                System.out.println("10");
-//                FileHandler fileHandler = new FileHandler(String.format("logfile%s.txt", date));
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+                String logName = String.format("logfile-%s.log", date.format(formatter));
+                FileHandler fileHandler = new FileHandler(logName, true);
 //                System.out.println("11");
-//                LOGGER.addHandler(fileHandler);
+                LOGGER.addHandler(fileHandler);
 //                System.out.println("12");
-//                fileHandler.setFormatter(consoleHandler.getFormatter());
-//                LOGGER.log(FINEST, "Starting to output to logfile.log");
+                fileHandler.setFormatter(consoleHandler.getFormatter());
+                LOGGER.log(FINEST, "Starting to output to " + logName);
+                LOGGER.log(FINEST, "Output: " + fileHandler.toString());
+
+
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -1399,6 +1406,6 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         } else {
             WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamVolume.ID, value);
         }
-        System.out.println("finisdhed");
+//        System.out.println("finisdhed");
     }
 }
