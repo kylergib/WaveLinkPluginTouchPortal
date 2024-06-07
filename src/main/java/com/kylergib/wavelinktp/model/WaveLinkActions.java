@@ -40,7 +40,7 @@ public abstract class WaveLinkActions {
             params.put("isAdjustVolume", false);
 
         } else {
-            System.out.println(4);
+//            System.out.println(4);
             params.put("isAdjustVolume", true);
             if (option.equals("Decrease")) {
                 value = (Integer) value * -1;
