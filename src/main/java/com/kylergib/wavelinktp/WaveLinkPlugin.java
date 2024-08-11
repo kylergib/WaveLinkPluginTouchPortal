@@ -1293,8 +1293,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
     public void sendDynamicStates(Input input) {
         //todo: left off, next to to update the send update states and add output level states
         LOGGER.log(Level.FINER, "Trying to send states for input: " + input.getName());
-        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getLocalMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getLocalMuteStateId(), input.getLocalMixerMuted());
-        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getStreamMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getStreamMuteStateId(), input.getStreamMixerMuted());
+        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getLocalMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getLocalMuteStateId(), input.getLocalMixerMuted() ? "muted" : "unmuted");
+        waveLinkPlugin.sendCreateState("WaveLinkMuteStates",input.getStreamMuteStateId().replace(" ", ""),"Wave Link Mute States",input.getStreamMuteStateId(), input.getStreamMixerMuted() ? "muted" : "unmuted");
 
 
         waveLinkPlugin.sendCreateState("WaveLinkFilterStates",input.getLocalFilterBypassStateId().replace(" ", ""),"Wave Link Filter States",input.getLocalFilterBypassStateId(), input.getPluginBypassLocal());
@@ -1327,6 +1327,8 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
 
 
         input.setStatesSentToTP(true);
+        waveLinkPlugin.setInputValue(input.getLocalMixerLevel(),"Local", input, true);
+        waveLinkPlugin.setInputValue(input.getStreamMixerLevel(),"Stream", input, true);
         LOGGER.log(Level.FINER, "Sent states for input: " + input.getName());
 
 
