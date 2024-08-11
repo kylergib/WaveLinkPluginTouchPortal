@@ -41,8 +41,9 @@ public class ApiHandler {
                 } else if (update instanceof ConnectorUpdateInfo) {
                     callback.onConnectorUpdate((ConnectorUpdateInfo) update);
 
-                    Thread.sleep(1000 / rate); // Delay between requests
+
                 }
+                Thread.sleep(1000 / rate); // Delay between requests
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

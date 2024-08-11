@@ -112,6 +112,7 @@ public abstract class Status {
                 }
                 WaveLinkPlugin.waveLinkPlugin.sendStateUpdate(WaveLinkPluginConstants.WaveLinkOutputs.States.StreamMixOut.ID,sendMute);
                 WaveLinkPlugin.setOutputValue(streamMixerLevel, "Stream", true);
+
             }
 
         }
@@ -248,6 +249,7 @@ public abstract class Status {
                 allInputs.add(newInput);
                 WaveLinkPlugin.waveLinkPlugin.sendDynamicStates(newInput);
             }
+
         }
 //        WaveLinkPlugin.waveLinkPlugin.sendChoiceUpdate(WaveLinkPluginConstants
 //                .WaveLinkInputs.States.InputList.ID, allInputsString);
