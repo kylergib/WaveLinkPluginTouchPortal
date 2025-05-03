@@ -282,7 +282,7 @@ public class WaveLinkPlugin extends TouchPortalPlugin implements TouchPortalPlug
         WaveLinkPlugin.LOGGER.log(Level.INFO, "Action actionSetOutputMute received: " + choices[0]);
         Status.selectMonitorMixOutputRunning = true;
         LOGGER.log(Level.INFO, "Action with Outputs received: " + choices[0]);
-        if (!Status.selectedOutput.equals(choices[0])) {
+        if (Status.selectedOutput == null || !Status.selectedOutput.equals(choices[0])) {
             Status.selectedOutput = choices[0];
             WaveLinkActions.setMonitorMixOutput(choices[0]);
 

@@ -102,6 +102,7 @@ public abstract class WaveLinkActions {
         JSONObject params = new JSONObject();
         params.put("identifier",inputIdentifier);
         params.put("name", name);
+        params.put("mixerID", "com.elgato.mix.local");
         actionSend(params,"setSelectedOutput", 12);
         Status.selectedOutputFinished = name;
     }
