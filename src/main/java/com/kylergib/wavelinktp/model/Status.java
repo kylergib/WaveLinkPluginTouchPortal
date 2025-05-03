@@ -300,23 +300,23 @@ public abstract class Status {
         allOutputs.clear();
         int id = (int) outputs.get("id");
         JSONObject resultJson = (JSONObject) outputs.get("result");
-        String selectedOutput = (String) resultJson.get("selectedOutput");
-        JSONArray newOutputs = (JSONArray) resultJson.get("outputs");
+        JSONObject selectedOutputs = (JSONObject) resultJson.get("selectedOutput");
+        String localSelectedOutput = (String) selectedOutputs.get("localMixer");
+        JSONObject newOutputs = (JSONObject) resultJson.get("outputs");
+        JSONArray newLocalOutputs = (JSONArray) newOutputs.get("localMixer");
 
-        for (int i = 0; i < newOutputs.length(); i++) {
-            JSONObject tempJson = (JSONObject) newOutputs.get(i);
+        for (int i = 0; i < newLocalOutputs.length(); i++) {
+            JSONObject tempJson = (JSONObject) newLocalOutputs.get(i);
             String identifier = (String) tempJson.get("identifier");
             String name = identifier.contains("SystemDefault") ? "System Default" : (String) tempJson.get("name");
             Boolean isSelected = false;
             Output newOutput = new Output(identifier, name, isSelected);
-            if (identifier.equals(selectedOutput)) {
+            if (identifier.equals(localSelectedOutput)) {
                 newOutput.setSelected(true);
                 currentOutputLocal = newOutput;
-                selectedOutput = newOutput.getName();
+                localSelectedOutput = newOutput.getName();
                 selectedOutputFinished = newOutput.getName();
             }
-
-
             allOutputs.add(newOutput);
 
 
