@@ -90,10 +90,12 @@ public class WaveLinkClient extends WebSocketClient {
             else if (lastBroadcastSent != -4 && (System.currentTimeMillis() - lastBroadcastSent)/1000 < WaveLinkPlugin.broadcastTimerInt) {
                 WaveLinkPlugin.LOGGER.log(Level.FINER, "Broadcast timer is skipped because timer has not been initialized or greater than timer integer.");
                 return;
+            } else if (true) {
+                return;
             }
-
             JSONObject params = (JSONObject) newReceive.get("params");
-            JSONArray mixerList = (JSONArray) params.get("MixerList");
+//            WaveLinkPlugin.LOGGER.log(Level.FINER, params.toString());
+            JSONArray mixerList = (JSONArray) params.get("mixerList");
             mixerList.forEach(mixerInput -> {
                 String inputIdentifier = (String) ((JSONObject) mixerInput).get("identifier");
                 BigDecimal levelLeft = ((BigDecimal) ((JSONObject) mixerInput).get("levelLeft")).setScale(2, RoundingMode.HALF_UP);
