@@ -90,6 +90,8 @@ public class WaveLinkClient extends WebSocketClient {
             else if (lastBroadcastSent != -4 && (System.currentTimeMillis() - lastBroadcastSent)/1000 < WaveLinkPlugin.broadcastTimerInt) {
                 WaveLinkPlugin.LOGGER.log(Level.FINER, "Broadcast timer is skipped because timer has not been initialized or greater than timer integer.");
                 return;
+            } else if (true) { // disables realtime for wl 2.0
+                return;
             }
 
             JSONObject params = (JSONObject) newReceive.get("params");
