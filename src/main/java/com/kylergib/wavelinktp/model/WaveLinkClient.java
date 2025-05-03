@@ -415,7 +415,11 @@ public class WaveLinkClient extends WebSocketClient {
                 }
             } else if (method.equals("selectedOutputChanged")) {
                 JSONObject params = (JSONObject) newReceive.get("params");
-                String outputIdentifier = (String) params.get("value");
+                String outputIdentifier = (String) params.get("identifier");
+                String mixerID = (String) params.get("mixerID");
+                if (!mixerID.equals("com.elgato.mix.local")) {
+                    return;
+                }
                 for (Output output: Status.allOutputs) {
                     if (output.getIdentifier().equals(outputIdentifier)) {
                         //TODO: make this cleaner, as i think setting both these is redundant

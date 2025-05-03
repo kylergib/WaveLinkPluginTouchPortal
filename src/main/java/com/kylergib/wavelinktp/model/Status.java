@@ -308,10 +308,10 @@ public abstract class Status {
         for (int i = 0; i < newLocalOutputs.length(); i++) {
             JSONObject tempJson = (JSONObject) newLocalOutputs.get(i);
             String identifier = (String) tempJson.get("identifier");
-            String name = identifier.contains("SystemDefault") ? "System Default" : (String) tempJson.get("name");
+            String name = (String) tempJson.get("name");
             Boolean isSelected = false;
             Output newOutput = new Output(identifier, name, isSelected);
-            if (identifier.equals(localSelectedOutput)) {
+            if (localSelectedOutput.contains(identifier)) {
                 newOutput.setSelected(true);
                 currentOutputLocal = newOutput;
                 localSelectedOutput = newOutput.getName();
