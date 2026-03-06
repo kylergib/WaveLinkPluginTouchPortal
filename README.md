@@ -1,5 +1,8 @@
+# THIS IS FOR WAVE LINK 2. If you are using Wave Link 3, go here: [Wave Link 3](https://github.com/kylergib/WaveLink-3-TP)
+
 # WaveLinkPluginTouchPortal
 Wave Link Touch Portal Plugin
+
 
 ## Latest Release changes:
 - Adds a broadcast timer, so that wave link will not overload touch portal with changes to the decibel levels. This can be set to -1 to disable completely if you do not want to use it. Default is 5, so it will only update the decibel states every 6 seconds, but you can change it to what you wish.
